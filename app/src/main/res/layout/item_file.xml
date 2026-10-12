@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout android:layout_width="fill_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:layout_gravity="end" android:orientation="horizontal" android:id="@id/fButtons" android:layout_width="wrap_content" android:layout_height="fill_parent">
+        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/accent" android:gravity="center" android:id="@id/fbEnqueue" android:background="@color/accent_tint8" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/sw_enqueue" />
+        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/fbCopy" android:background="@color/bg_soft" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/sw_copy" />
+        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/fbMove" android:background="@color/bg_soft" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/sw_move" />
+        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/error_text" android:gravity="center" android:id="@id/fbDelete" android:background="@color/error_tint" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/delete" />
+    </LinearLayout>
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/fgContent" android:background="@drawable/bg_file_fg" android:paddingLeft="12.0dip" android:paddingTop="6.0dip" android:paddingRight="10.0dip" android:paddingBottom="6.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <ImageView android:id="@id/fBadge" android:layout_width="24.0dip" android:layout_height="24.0dip" android:scaleType="fitCenter" />
+        <LinearLayout android:orientation="vertical" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_marginLeft="8.0dip" android:layout_weight="1.0">
+            <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="@color/label" android:ellipsize="end" android:id="@id/fName" android:layout_width="fill_parent" android:layout_height="wrap_content" android:singleLine="true" />
+            <TextView android:textSize="10.0sp" android:textColor="@color/label_tertiary" android:id="@id/fMeta" android:layout_width="fill_parent" android:layout_height="wrap_content" android:singleLine="true" android:fontFamily="monospace" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout android:layout_width="fill_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="16.0dip" android:paddingRight="4.0dip" android:layout_width="fill_parent" android:layout_height="60.0dip">
+        <View android:id="@id/dot" android:background="@drawable/dot_idle" android:layout_width="7.0dip" android:layout_height="7.0dip" />
+        <TextView android:textSize="16.0sp" android:textStyle="bold" android:textColor="@color/label" android:ellipsize="end" android:id="@id/name" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_marginLeft="10.0dip" android:singleLine="true" android:layout_weight="1.0" />
+        <TextView android:textSize="11.0sp" android:textColor="@color/label_tertiary" android:id="@id/index" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="8.0dip" android:fontFamily="monospace" />
+        <ImageView android:id="@id/btnMore" android:background="?selectableItemBackgroundBorderless" android:padding="12.0dip" android:layout_width="44.0dip" android:layout_height="44.0dip" android:layout_marginLeft="4.0dip" android:src="@drawable/ic_more" android:contentDescription="更多操作" />
+    </LinearLayout>
+    <View android:layout_gravity="start|center" android:id="@id/activeBar" android:background="@color/accent" android:visibility="gone" android:layout_width="3.0dip" android:layout_height="36.0dip" />
+    <View android:layout_gravity="bottom" android:id="@id/divider" android:background="@color/divider" android:layout_width="fill_parent" android:layout_height="1.0px" android:layout_marginLeft="16.0dip" android:layout_marginRight="16.0dip" />
+</FrameLayout>

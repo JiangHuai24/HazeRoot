@@ -1,0 +1,20 @@
+# 构建产物
+.gradle/
+build/
+
+# 本机配置
+local.properties
+
+# 本地留存素材（不随仓库公开）
+recovery/
+
+# 安装包
+*.apk
+*.aab
+
+# IDE / 系统
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db

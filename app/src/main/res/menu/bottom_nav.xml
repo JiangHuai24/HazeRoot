@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:icon="@drawable/ic_nav_queue" android:id="@id/navQueue" android:title="队列" />
+    <item android:icon="@drawable/ic_nav_files" android:id="@id/navFiles" android:title="文件" />
+    <item android:icon="@drawable/ic_bolt" android:id="@id/navPresets" android:title="方案库" />
+</menu>

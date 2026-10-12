@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@id/actionRun" android:title="运行" />
+    <item android:id="@id/actionTarget" android:title="目标应用" />
+    <item android:id="@id/actionRename" android:title="重命名" />
+    <item android:id="@id/actionDelete" android:title="删除" />
+</menu>
