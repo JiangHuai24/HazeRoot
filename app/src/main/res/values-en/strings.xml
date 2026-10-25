@@ -84,7 +84,7 @@ Folder: %5$s"</string>
     <string name="err_empty_path">Path cannot be empty</string>
     <string name="err_no_dir_fmt">Directory not found: %1$s</string>
     <string name="err_perm_fmt">Permission denied: %1$s</string>
-    <string name="err_read_dir">Cannot read directory (no root / command failed)</string>
+    <string name="err_read_dir">Read failed, please retry (root command returned nothing)</string>
     <string name="err_slash">Name cannot contain /</string>
     <string name="err_url">Link must start with http(s)://</string>
     <string name="exists_msg_fmt">%1$s already exists. Overwrite it?</string>

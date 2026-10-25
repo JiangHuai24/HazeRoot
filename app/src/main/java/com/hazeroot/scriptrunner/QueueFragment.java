@@ -616,6 +616,8 @@ public final class QueueFragment extends Fragment {
             scriptAdapter.notifyDataSetChanged();
         }
         syncTerm();
+        // 每次回到前台重新确认 root 状态（覆盖"刚打开误报无 root"的情况）
+        threadRootCheck();
     }
 
     @Override // androidx.fragment.app.Fragment
@@ -1359,7 +1361,8 @@ public final class QueueFragment extends Fragment {
     /* JADX INFO: Access modifiers changed from: private */
     public static final void threadRootCheck$lambda$38(final QueueFragment this$0) {
         Intrinsics.checkNotNullParameter(this$0, "this$0");
-        final boolean ok = Engine.INSTANCE.checkRoot();
+        // 强制重探：用户点"重新检测"或回到前台时，必须忽略旧缓存
+        final boolean ok = Engine.INSTANCE.refreshRoot();
         FragmentActivity activity = this$0.getActivity();
         if (activity != null) {
             activity.runOnUiThread(new Runnable() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda29

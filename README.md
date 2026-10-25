@@ -38,7 +38,7 @@ HazeRoot 以 root 身份按队列顺序执行 shell 脚本 / ELF 可执行文件
 
 ## 版本
 
-当前版本 **v2.8.0**（versionCode 66）
+当前版本 **v2.8.4**（versionCode 70）
 
 ## 许可
 

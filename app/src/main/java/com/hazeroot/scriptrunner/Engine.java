@@ -65,6 +65,11 @@ public final class Engine {
     private static volatile long lastOutputAt;
     private static Map<String, List<String>> recordingCollect;
     private static volatile Boolean rootCache;
+    private static volatile long rootCacheAt = 0L;
+    // 全局 su 串行锁：文件页两窗并行加载 + ELF 探测会同时发起多个 su 进程，
+    // KernelSU 在高并发下会拒绝/超时，表现为"Root Active 但命令失败"。
+    // 所有 su 调用串行化，稳定优先（每次 su 仅几十毫秒）。
+    private static final Object SU_LOCK = new Object();
     private static volatile boolean runningNow;
     public static final Engine INSTANCE = new Engine();
     private static final List<ScriptItem> scripts = new ArrayList();
@@ -250,14 +255,63 @@ public final class Engine {
     }
 
     public final boolean checkRoot() {
-        try {
-            java.lang.Process p = new ProcessBuilder("su", "-c", "id").start();
-            String out = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            p.waitFor();
-            return Kt.contains((CharSequence) out, (CharSequence) "uid=0", false, 2, (Object) null);
-        } catch (Exception e) {
-            return false;
+        // 冷启动时 KSU / Magisk 的授权链路可能尚未就绪，单次判定极易误报"无 root"。
+        // 这里做 3 次重试（每次最多等 3 秒），任一次拿到 uid=0 即认为已授权。
+        for (int attempt = 0; attempt < 3; attempt++) {
+            java.lang.Process p = null;
+            try {
+                p = new ProcessBuilder("su", "-c", "id").start();
+                final java.io.InputStream is = p.getInputStream();
+                final StringBuilder sb = new StringBuilder();
+                Thread reader = new Thread(new Runnable() {
+                    @Override // java.lang.Runnable
+                    public void run() {
+                        try {
+                            byte[] buf = new byte[256];
+                            int n;
+                            while ((n = is.read(buf)) > 0) {
+                                sb.append(new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8));
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                });
+                reader.setDaemon(true);
+                reader.start();
+                boolean done = p.waitFor(3000L, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (!done) {
+                    p.destroyForcibly();
+                }
+                reader.join(600L);
+                if (Kt.contains((CharSequence) sb.toString(), (CharSequence) "uid=0", false, 2, (Object) null)) {
+                    rootCache = Boolean.TRUE;
+                    rootCacheAt = System.currentTimeMillis();
+                    return true;
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (p != null) {
+                    try {
+                        p.destroy();
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+            try {
+                Thread.sleep(600L);
+            } catch (InterruptedException ignored) {
+            }
         }
+        rootCache = Boolean.FALSE;
+        rootCacheAt = System.currentTimeMillis();
+        return false;
+    }
+
+    /** 强制重新探测 root（忽略缓存），用于冷启动/回到前台/用户点"重新检测" */
+    public final boolean refreshRoot() {
+        rootCache = null;
+        rootCacheAt = 0L;
+        return checkRoot();
     }
 
     public final Pair<String, String> detectRootManager() {
@@ -350,32 +404,58 @@ public final class Engine {
 
     public final String su(String cmd) {
         Intrinsics.checkNotNullParameter(cmd, "cmd");
-        try {
-            // 注意：部分 su 实现（如 KernelSU）对 "su -c 'a; b'" 只给第一条命令提权，
-            // 后续命令会降回 shell(uid 2000)，导致 cp/tar 等以非 root 身份执行。
-            // 用 sh -c 显式包裹，保证整条复合命令在同一个 root shell 内运行。
-            java.lang.Process p = new ProcessBuilder("su", "-c", "sh -c " + q(cmd)).redirectErrorStream(true).start();
-            InputStream inputStream = p.getInputStream();
-            Intrinsics.checkNotNullExpressionValue(inputStream, "getInputStream(...)");
-            String out = new String(ByteStreamsKt.readBytes(inputStream), Charsets.UTF_8);
-            if (p.waitFor() == 0) {
-                return out;
+        // 冷启动阶段 su 守护进程/授权链路可能尚未就绪，单次调用会偶发失败
+        // （表现为"Root Active 却提示无 root / 命令失败"）。这里做 3 次重试。
+        // 本项目所有 su 命令（ls/cp/mv/rm/mkdir/touch/tar/chmod）都是幂等的，重试安全。
+        synchronized (SU_LOCK) {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            java.lang.Process p = null;
+            try {
+                // 注意：部分 su 实现（如 KernelSU）对 "su -c 'a; b'" 只给第一条命令提权，
+                // 后续命令会降回 shell(uid 2000)，导致 cp/tar 等以非 root 身份执行。
+                // 用 sh -c 显式包裹，保证整条复合命令在同一个 root shell 内运行。
+                p = new ProcessBuilder("su", "-c", "sh -c " + q(cmd)).redirectErrorStream(true).start();
+                InputStream inputStream = p.getInputStream();
+                Intrinsics.checkNotNullExpressionValue(inputStream, "getInputStream(...)");
+                String out = new String(ByteStreamsKt.readBytes(inputStream), Charsets.UTF_8);
+                if (p.waitFor() == 0) {
+                    return out;
+                }
+                Log.d(TAG, "su 第 " + (attempt + 1) + " 次失败，cmd=" + cmd + " out=" + out);
+            } catch (Exception e) {
+                Log.d(TAG, "su 第 " + (attempt + 1) + " 次异常，cmd=" + cmd + " err=" + e);
+            } finally {
+                if (p != null) {
+                    try {
+                        p.destroy();
+                    } catch (Exception ignored) {
+                    }
+                }
             }
-            return null;
-        } catch (Exception e) {
-            return null;
+            try {
+                Thread.sleep(350L);
+            } catch (InterruptedException ignored) {
+            }
+        }
+        return null;
         }
     }
 
     public final boolean rootAvailable() {
-        Boolean bool = rootCache;
-        if (bool != null) {
-            boolean it = bool.booleanValue();
-            return it;
+        Boolean cached = rootCache;
+        if (cached != null && cached.booleanValue()) {
+            // 已确认有 root：长期有效（root 不会凭空消失）
+            return true;
         }
-        boolean ok = checkRoot();
-        rootCache = Boolean.valueOf(ok);
-        return ok;
+        if (cached != null) {
+            // 无 root 的结论只短期有效，过期后重新探测，
+            // 避免冷启动时的一次误判被永久钉死（表现为"明明授权了却提示没 root"）。
+            long age = System.currentTimeMillis() - rootCacheAt;
+            if (age < 15000L) {
+                return false;
+            }
+        }
+        return checkRoot();
     }
 
     public final String exec(String cmd) {
@@ -400,17 +480,35 @@ public final class Engine {
     public final byte[] execBytes(String cmd) {
         Intrinsics.checkNotNullParameter(cmd, "cmd");
         if (rootAvailable()) {
-            try {
-                java.lang.Process p = new ProcessBuilder("su", "-c", "sh -c " + q(cmd)).start();
-                InputStream inputStream = p.getInputStream();
-                Intrinsics.checkNotNullExpressionValue(inputStream, "getInputStream(...)");
-                byte[] data = ByteStreamsKt.readBytes(inputStream);
-                if (p.waitFor() == 0) {
-                    return data;
+            // 同 su()：串行化 + 重试 3 次
+            synchronized (SU_LOCK) {
+            for (int attempt = 0; attempt < 3; attempt++) {
+                java.lang.Process p = null;
+                try {
+                    p = new ProcessBuilder("su", "-c", "sh -c " + q(cmd)).start();
+                    InputStream inputStream = p.getInputStream();
+                    Intrinsics.checkNotNullExpressionValue(inputStream, "getInputStream(...)");
+                    byte[] data = ByteStreamsKt.readBytes(inputStream);
+                    if (p.waitFor() == 0) {
+                        return data;
+                    }
+                    Log.d(TAG, "execBytes 第 " + (attempt + 1) + " 次失败，cmd=" + cmd);
+                } catch (Exception e) {
+                    Log.d(TAG, "execBytes 第 " + (attempt + 1) + " 次异常，cmd=" + cmd + " err=" + e);
+                } finally {
+                    if (p != null) {
+                        try {
+                            p.destroy();
+                        } catch (Exception ignored) {
+                        }
+                    }
                 }
-                return null;
-            } catch (Exception e) {
-                return null;
+                try {
+                    Thread.sleep(350L);
+                } catch (InterruptedException ignored) {
+                }
+            }
+            return null;
             }
         }
         try {

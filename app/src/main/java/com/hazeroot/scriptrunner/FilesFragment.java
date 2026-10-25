@@ -351,14 +351,34 @@ public final class FilesFragment extends Fragment {
             Pane it = (Pane) element$iv2;
             Pane.load$default(it, it.getDir(), 0, 2, null);
         }
-        if (!Engine.INSTANCE.rootAvailable() && !Environment.isExternalStorageManager() && !askedStorageAccess) {
+        // 无 root 引导：必须"强制重新探测"后再决定是否弹窗。
+        // 原先直接用 rootAvailable()，冷启动时缓存可能被一次误判钉死为 false，
+        // 导致明明已授权却弹"需要 root"（用户反馈的乱弹窗）。
+        if (!Environment.isExternalStorageManager() && !askedStorageAccess) {
             askedStorageAccess = true;
-            new AlertDialog.Builder(requireContext()).setTitle(getString(R.string.no_root_guide_title)).setMessage(getString(R.string.no_root_guide_msg)).setPositiveButton(getString(R.string.no_root_go), new DialogInterface.OnClickListener() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda21
-                @Override // android.content.DialogInterface.OnClickListener
-                public final void onClick(DialogInterface dialogInterface, int i) {
-                    FilesFragment.onViewCreated$lambda$22(FilesFragment.this, dialogInterface, i);
+            new Thread(new Runnable() {
+                @Override // java.lang.Runnable
+                public void run() {
+                    final boolean ok = Engine.INSTANCE.refreshRoot();
+                    if (ok || !isAdded()) {
+                        return;
+                    }
+                    requireActivity().runOnUiThread(new Runnable() {
+                        @Override // java.lang.Runnable
+                        public void run() {
+                            if (!isAdded()) {
+                                return;
+                            }
+                            new AlertDialog.Builder(requireContext()).setTitle(getString(R.string.no_root_guide_title)).setMessage(getString(R.string.no_root_guide_msg)).setPositiveButton(getString(R.string.no_root_go), new DialogInterface.OnClickListener() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda21
+                                @Override // android.content.DialogInterface.OnClickListener
+                                public final void onClick(DialogInterface dialogInterface, int i) {
+                                    FilesFragment.onViewCreated$lambda$22(FilesFragment.this, dialogInterface, i);
+                                }
+                            }).setNegativeButton(getString(R.string.no_root_skip), (DialogInterface.OnClickListener) null).show();
+                        }
+                    });
                 }
-            }).setNegativeButton(getString(R.string.no_root_skip), (DialogInterface.OnClickListener) null).show();
+            }).start();
         }
     }
 
@@ -670,6 +690,11 @@ public final class FilesFragment extends Fragment {
             this$0.setActive();
             if (this$1.expandedTag != null) {
                 this$1.collapseSwipe();
+                return;
+            }
+            // 防御：pos 为 -1 说明该行不属于当前判定的窗格（绝不该发生），
+            // 直接忽略，不能当作"点在空白处"去弹新建菜单。
+            if (pos < 0) {
                 return;
             }
             FsEntry e = (FsEntry) CollectionsKt.getOrNull(this$0.entries, pos);
@@ -1560,31 +1585,13 @@ public final class FilesFragment extends Fragment {
             return;
         }
         fg.setBackgroundResource((this.multiMode && this.selected.contains(item.getPath())) ? R.drawable.bg_file_sel : R.drawable.bg_file_fg);
-        Iterable $this$firstOrNull$iv = this.panes;
-        Iterator it = $this$firstOrNull$iv.iterator();
-        while (true) {
-            if (!it.hasNext()) {
-                break;
-            }
-            Object element$iv = it.next();
-            Pane it2 = (Pane) element$iv;
-            String path = item.getPath();
-            String dir = it2.getDir();
-            char[] cArr = new char[i];
-            cArr[0] = '/';
-            if (Kt.startsWith(path, StringsKt.trimEnd(dir, cArr), false, 2, (Object) null)) {
-                obj = element$iv;
-                break;
-            } else {
-                obj = null;
-                i = 1;
-            }
-        }
-        Pane pane = (Pane) obj;
-        if (pane == null) {
-            pane = getActive();
-        }
-        final Pane pane2 = pane;
+        // 修复：不能用"路径前缀"判断行属于哪个窗格。
+        // 当左右两窗打开同一目录（或左窗是右窗的父目录）时，右窗的行也会匹配到左窗，
+        // 随后 getPositionForView 在错误的 ListView 里返回 -1，onItemClick 拿到 null
+        // 并错误地弹出"新建"菜单。
+        // 注意：这里绑定行时该 View 还没 attach 到 ListView，getParent() 为 null，
+        // 所以不能在绑定时判定，改为在触摸/点击事件发生时用 view.getParent() 判定。
+        final Pane pane2 = paneOfRow(this, view);
         final ListView list = pane2.getList();
         final Ref.FloatRef downX = new Ref.FloatRef();
         final Ref.FloatRef downY = new Ref.FloatRef();
@@ -1675,8 +1682,10 @@ public final class FilesFragment extends Fragment {
                 mode.element = 0;
                 longFired.element = false;
                 dragAnchor.element = -1;
+                // 用该行实际所在窗格的列表取屏幕位置（左右同目录时不能用错误窗格）
+                Pane downPane = paneOfRow(this$0, v);
                 int[] it = new int[2];
-                list.getLocationOnScreen(it);
+                downPane.getList().getLocationOnScreen(it);
                 listTop.element = it[1];
                 if (this$0.expandedTag != null && !Intrinsics.areEqual(this$0.expandedTag, $item.getPath())) {
                     this$0.collapseSwipe();
@@ -1719,20 +1728,26 @@ public final class FilesFragment extends Fragment {
                     }
                     break;
                 } else if (longFired.element) {
-                    pane.setActive();
-                    if (this$0.multiMode && this$0.selPane == pane) {
+                    Pane rowPaneL = paneOfRow(this$0, v);
+                    rowPaneL.setActive();
+                    if (this$0.multiMode && this$0.selPane == rowPaneL) {
                         this$0.multiMenu();
                     } else {
                         this$0.fileMenu($item);
                     }
                     break;
                 } else if (ev.getActionMasked() == 1) {
-                    pane.setActive();
-                    if (this$0.multiMode && this$0.selPane == pane) {
-                        this$0.toggleSelect($item.getPath(), pane);
+                    // 事件发生时按"该行实际所在的 ListView"判定窗格，
+                    // 避免左右同目录时把右窗的行误判成左窗，导致点击无反应。
+                    Pane rowPane = paneOfRow(this$0, v);
+                    rowPane.setActive();
+                    if (this$0.multiMode && this$0.selPane == rowPane) {
+                        this$0.toggleSelect($item.getPath(), rowPane);
                     } else {
-                        int pos = list.getPositionForView(v);
-                        list.performItemClick(v, pos, pos);
+                        int pos = rowPane.getList().getPositionForView(v);
+                        if (pos >= 0) {
+                            rowPane.getList().performItemClick(v, pos, pos);
+                        }
                     }
                     break;
                 }
@@ -1749,19 +1764,21 @@ public final class FilesFragment extends Fragment {
                         if (!this$0.multiMode || this$0.selPane != pane) {
                             this$0.enterMulti(pane);
                         }
-                        dragAnchor.element = list.getPositionForView(v);
+                        ListView dragList = paneOfRow(this$0, v).getList();
+                        dragAnchor.element = dragList.getPositionForView(v);
                         this$0.selectRange(pane, dragAnchor.element, dragAnchor.element);
                     }
                     if (mode.element == 2) {
+                        ListView moveList = paneOfRow(this$0, v).getList();
                         int y = (int) (ev.getRawY() - listTop.element);
-                        int pos2 = list.pointToPosition(list.getWidth() / 2, y);
+                        int pos2 = moveList.pointToPosition(moveList.getWidth() / 2, y);
                         if (pos2 >= 0) {
                             this$0.selectRange(pane, dragAnchor.element, pos2);
                         }
                         if (y < this$0.dp(40)) {
-                            list.smoothScrollBy(-this$0.dp(36), 0);
-                        } else if (y > list.getHeight() - this$0.dp(40)) {
-                            list.smoothScrollBy(this$0.dp(36), 0);
+                            moveList.smoothScrollBy(-this$0.dp(36), 0);
+                        } else if (y > moveList.getHeight() - this$0.dp(40)) {
+                            moveList.smoothScrollBy(this$0.dp(36), 0);
                         }
                     }
                     break;
@@ -1782,24 +1799,38 @@ public final class FilesFragment extends Fragment {
         return true;
     }
 
-    private static final Pane bindSwipe$paneOf(FilesFragment this$0, FsEntry $item) {
-        Object obj;
-        Iterable $this$firstOrNull$iv = this$0.panes;
-        Iterator it = $this$firstOrNull$iv.iterator();
-        while (true) {
-            obj = null;
-            if (!it.hasNext()) {
-                break;
-            }
-            Object element$iv = it.next();
-            Pane it2 = (Pane) element$iv;
-            if (Kt.startsWith($item.getPath(), StringsKt.trimEnd(it2.getDir(), '/'), false, 2, (Object) null)) {
-                obj = element$iv;
-                break;
+    /* 判定某一行视图实际属于哪个窗格。
+       用 getPositionForView 逐个探测：该行不在某个 ListView 里时返回 -1，最可靠。
+       行 View 在 bindSwipe 绑定时尚未 attach，因此必须在事件发生时调用。 */
+    private static final Pane paneOfRow(FilesFragment this$0, View rowView) {
+        if (rowView != null) {
+            for (Object element$iv : this$0.panes) {
+                Pane it2 = (Pane) element$iv;
+                if (it2.getList().getPositionForView(rowView) >= 0) {
+                    return it2;
+                }
             }
         }
-        Pane pane = (Pane) obj;
-        return pane == null ? this$0.getActive() : pane;
+        return this$0.getActive();
+    }
+
+    private static final Pane bindSwipe$paneOf(FilesFragment this$0, FsEntry $item) {
+        // 修复：改用"最长（最具体）目录匹配"，并在同长度时优先活动窗。
+        // 原先的"第一个前缀匹配"在左右同目录 / 左窗为右窗父目录时会命中错误窗格。
+        Pane best = null;
+        int bestLen = -1;
+        for (Object element$iv : this$0.panes) {
+            Pane it2 = (Pane) element$iv;
+            String dir = StringsKt.trimEnd(it2.getDir(), '/');
+            if (Kt.startsWith($item.getPath(), dir, false, 2, (Object) null)) {
+                int len = dir.length();
+                if (len > bestLen || (len == bestLen && it2 == this$0.getActive())) {
+                    best = it2;
+                    bestLen = len;
+                }
+            }
+        }
+        return best == null ? this$0.getActive() : best;
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -2087,22 +2118,20 @@ public final class FilesFragment extends Fragment {
 
     /* JADX INFO: Access modifiers changed from: private */
     public final void fileMenu(final FsEntry e) {
-        Object obj;
-        Iterable $this$firstOrNull$iv = this.panes;
-        Iterator it = $this$firstOrNull$iv.iterator();
-        while (true) {
-            obj = null;
-            if (!it.hasNext()) {
-                break;
-            }
-            Object element$iv = it.next();
+        // 修复：同 bindSwipe$paneOf —— 取最长（最具体）目录匹配，同长度优先活动窗。
+        Pane pane = null;
+        int bestLen = -1;
+        for (Object element$iv : this.panes) {
             Pane it2 = (Pane) element$iv;
-            if (Kt.startsWith(e.getPath(), StringsKt.trimEnd(it2.getDir(), '/'), false, 2, (Object) null)) {
-                obj = element$iv;
-                break;
+            String dir = StringsKt.trimEnd(it2.getDir(), '/');
+            if (Kt.startsWith(e.getPath(), dir, false, 2, (Object) null)) {
+                int len = dir.length();
+                if (len > bestLen || (len == bestLen && it2 == getActive())) {
+                    pane = it2;
+                    bestLen = len;
+                }
             }
         }
-        Pane pane = (Pane) obj;
         if (pane == null) {
             pane = getActive();
         }

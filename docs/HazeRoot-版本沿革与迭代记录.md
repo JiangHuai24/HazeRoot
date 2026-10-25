@@ -33,7 +33,7 @@
 |---|---|
 | **第一代** | v2.7.2（versionCode 62）—— 目前可追溯的最早版本，作为基线 |
 | 版本号 | `主.次.修订`（如 `2.8.0`）；每次发版 `versionCode` 递增 1 |
-| 当前版本 | **v2.8.0**（versionCode 66） |
+| 当前版本 | **v2.8.4**（versionCode 70） |
 
 > 早期开发记录（v2.7.2 之前的迭代过程）已丢失，故以 v2.7.2 为第一代重新建立档案。
 
@@ -47,7 +47,11 @@
 | v2.7.3 | 63 | — | **产物缺失** | 记录缺失（按 versionCode 推断存在） |
 | v2.7.4 | 64 | 旧包名（已弃用） | `app_v274.apk`（本地归档） | 旧包名 |
 | v2.7.5 | 65 | 旧包名（已弃用） | `HazeRoot-v2.7.5.apk` / `HazeRoot-v2.7.5b.apk` | 旧包名 |
-| **v2.8.0（当前）** | 66 | `com.hazeroot.scriptrunner` | `app/build/outputs/apk/debug/app-debug.apk` | **源码复原 + 去品牌化** |
+| **v2.8.0** | 66 | `com.hazeroot.scriptrunner` | `app/build/outputs/apk/debug/app-debug.apk` | **源码复原 + 去品牌化** |
+| v2.8.1 | 67 | `com.hazeroot.scriptrunner` | 同上 | 修复双窗同目录点击无反应 |
+| v2.8.2 | 68 | `com.hazeroot.scriptrunner` | 同上 | 修复 root 误判与乱弹窗 |
+| v2.8.3 | 69 | `com.hazeroot.scriptrunner` | 同上 | su 重试 + 错误文案修正 |
+| **v2.8.4（当前）** | 70 | `com.hazeroot.scriptrunner` | `HazeRoot-v2.8.4.apk` | su 串行化，文件页稳定 |
 
 ---
 
@@ -84,6 +88,17 @@ v2.8.0 是"源码复原 + 品牌统一"的合并版本，主要工作分两部�
 **功能等价性**：除包名 / 路径 / 示例数据外，**引擎与全部功能逻辑零改动**。逐文件 diff 仅 `MainActivity`(8 行) / `QueueFragment`(2 行) / `Store`(6 行) 三处实质差异，均为上述清理项。
 
 > ⚠ **升级注意**：v2.8.0 包名变更后签名与身份都变了，**旧版本无法覆盖升级**，需先卸载再安装。手机里原有的旧脚本目录也不会自动迁移。
+
+### 4.3 v2.8.1 – v2.8.4 稳定性修复
+
+| 版本 | 缺陷 | 根因 | 修复 |
+|---|---|---|---|
+| v2.8.1 | 左右两窗打开同一目录（或左窗为右窗父目录）时，点右窗行无反应 / 误弹「新建」 | 用「路径前缀 startsWith」判定行属于哪个窗格，右窗的行命中了左窗 → getPositionForView 返回 -1 → 取到 null → 走空白菜单 | 改用 getPositionForView 逐窗探测；pos < 0 时直接忽略 |
+| v2.8.2 | 明明已授权却提示无 root、乱弹「需要 root」引导窗 | rootCache 只写不失效，冷启动时 KernelSU 授权未就绪的一次误判被永久钉死；checkRoot 无重试无超时 | checkRoot 3 次重试 + 3s 超时并写缓存；缓存分极性（true 长期 / false 15s TTL）；新增 refreshRoot；回前台与弹窗前强制重探 |
+| v2.8.3 | 文件页偶发「无法读取目录（无 root / 命令失败）」 | 两窗并行加载 + ELF 批量探测同时发起多个 su 进程，KernelSU 高并发下拒绝/超时 | su / execBytes 增加 3 次重试；错误文案改为「读取失败，请重试」 |
+| v2.8.4 | 上述并发问题仍偶发 | 重试不能解决并发本身 | 所有 su 调用加全局串行锁 SU_LOCK，彻底消除并发风暴 |
+
+**压测结论（v2.8.4）**：连续 5 次冷启动进入文件页，5/5 正常（Root Active、目录正常列出、零错误提示、零多余弹窗）；双窗同目录 / 父子目录点击回归均通过。
 
 ---
 
