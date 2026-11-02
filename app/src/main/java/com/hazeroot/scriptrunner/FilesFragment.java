@@ -868,11 +868,20 @@ public final class FilesFragment extends Fragment {
     private String sortMode = "name";
 
     private void loadFilePrefs() {
+        // ★ 修复「文件页看着全坏了」：过滤开关（隐藏文件 / 只显示脚本）曾被持久化，
+        //   用户一旦打开过，之后每次进文件页就只剩 .sh，其它文件全部消失，
+        //   看起来像文件被删掉。这类「过滤视图」是临时态，不该跨会话记忆。
+        //   现在：过滤开关每次回到默认（显示全部）；只有排序方式保留。
+        showHidden = true;
+        onlyScripts = false;
         try {
-            android.content.SharedPreferences p = homePrefs();
-            showHidden = p.getBoolean(K_SHOW_HIDDEN, true);
-            onlyScripts = p.getBoolean(K_ONLY_SCRIPT, false);
-            sortMode = p.getString(K_SORT_MODE, "name");
+            sortMode = homePrefs().getString(K_SORT_MODE, "name");
+        } catch (Exception ignored) {
+            sortMode = "name";
+        }
+        // 清掉历史遗留的持久化值，避免旧版本写入的状态继续生效
+        try {
+            homePrefs().edit().remove(K_SHOW_HIDDEN).remove(K_ONLY_SCRIPT).apply();
         } catch (Exception ignored) {
         }
     }
