@@ -59,7 +59,9 @@ public final class Engine {
     private static volatile boolean abortFlag;
     private static Context appCtx;
     private static volatile Boolean busyboxScriptOk;
-    private static java.lang.Process currentProc;
+    // 修复竞态：执行线程写、UI 线程读（abort/sendRaw），非 volatile 会导致读到过期进程，
+    // 表现为「停止关错进程」「手动输入写进上一个进程」。
+    private static volatile java.lang.Process currentProc;
     private static volatile boolean finalized;
     private static volatile boolean hadAutoInput;
     private static volatile long lastOutputAt;
@@ -71,9 +73,12 @@ public final class Engine {
     // 所有 su 调用串行化，稳定优先（每次 su 仅几十毫秒）。
     private static final Object SU_LOCK = new Object();
     private static volatile boolean runningNow;
+    // 执行门禁：compareAndSet 原子化，防止 runQueue 被并发调用导致双队列同时执行
+    private static final java.util.concurrent.atomic.AtomicBoolean RUNNING_GATE =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
     public static final Engine INSTANCE = new Engine();
-    private static final List<ScriptItem> scripts = new ArrayList();
-    private static final List<Preset> presets = new ArrayList();
+    private static final List<ScriptItem> scripts = new CopyOnWriteArrayList();
+    private static final List<Preset> presets = new CopyOnWriteArrayList();
     private static final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
     private static final Handler main = new Handler(Looper.getMainLooper());
     private static volatile String currentPartial = "";
@@ -547,7 +552,10 @@ public final class Engine {
         Intrinsics.checkNotNullParameter(list, "list");
         Intrinsics.checkNotNullParameter(targetApp, "targetApp");
         Log.d(TAG, "runQueue 请求 auto=" + auto + " runningNow=" + runningNow + " 脚本数=" + list.size());
-        if (runningNow) {
+        // 修复竞态：原「if (runningNow) return; runningNow = true;」是 check-then-act，
+        // 两个线程可同时通过检查 → 双队列并发执行、同时写 termBuffer、抢 currentProc。
+        // 改用 AtomicBoolean 原子门禁。
+        if (!RUNNING_GATE.compareAndSet(false, true)) {
             Log.d(TAG, "runQueue 被忽略：已有任务在执行");
             return;
         }
@@ -686,6 +694,8 @@ public final class Engine {
                 Log.d("ScriptRunner", "队列结束 aborted=" + aborted);
                 Engine engine3 = Engine.INSTANCE;
                 Engine.runningNow = false;
+                // 释放执行门禁，允许下一次 runQueue
+                Engine.RUNNING_GATE.set(false);
                 Engine.INSTANCE.emit("state", "");
                 Engine engine4 = Engine.INSTANCE;
                 context2 = Engine.appCtx;
