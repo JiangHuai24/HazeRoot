@@ -3,6 +3,7 @@
 // 第一代基线：v2.7.2 · 当前版本见 versionName
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -30,6 +31,12 @@ android {
 
     packaging {
         resources.excludes += setOf("META-INF/*.kotlin_module")
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 

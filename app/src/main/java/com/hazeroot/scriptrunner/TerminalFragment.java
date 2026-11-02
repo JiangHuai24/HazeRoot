@@ -337,7 +337,11 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
             for (ScriptItem s : copied) {
                 answers += s.getRecordedInputs().size();
             }
-            toast(getString(R.string.preset_saved_fmt, name, copied.size(), answers));
+            // preset_saved_fmt 只有一个占位符 %1$s（方案名）。
+            // 原 JADX 调用多传了 2 个参数 → String.format 抛
+            // MissingFormatArgumentException，被下方 catch 吞掉后弹「保存失败」，
+            // 实际方案已保存成功，表现为「保存了却报失败」的假故障。
+            toast(getString(R.string.preset_saved_fmt, name));
         } catch (Exception e) {
             toast("保存失败：" + e.getMessage());
         }

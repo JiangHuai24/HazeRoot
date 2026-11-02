@@ -1631,8 +1631,4 @@ public final class Engine {
         }
         return sb.toString();
     }
-
-    private final String resolveAnswer(ScriptItem s, String line, boolean auto) {
-        return null;
-    }
 }

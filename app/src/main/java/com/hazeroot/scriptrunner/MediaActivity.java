@@ -508,9 +508,20 @@ public final class MediaActivity extends AppCompatActivity {
     /* JADX INFO: Access modifiers changed from: private */
     public static final boolean startAudio$lambda$20(MediaActivity this$0, MediaPlayer mediaPlayer, int i, int i2) {
         Intrinsics.checkNotNullParameter(this$0, "this$0");
-        String string = this$0.getString(R.string.media_load_fail);
-        Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
-        this$0.toast(string);
+        // ★ 修复：原实现只弹 toast 就 return，既不 release 也不把 mp 置 null，
+        //   出错后 this$0.tick 会继续每秒轮询一个 error 状态的 player（反复触发 onError）。
+        this$0.toast(this$0.getString(R.string.media_load_fail));
+        try {
+            mediaPlayer.release();
+        } catch (Exception ignored) {
+        }
+        if (this$0.mp == mediaPlayer) {
+            this$0.mp = null;
+        }
+        try {
+            this$0.h.removeCallbacks(this$0.tick);
+        } catch (Exception ignored) {
+        }
         return true;
     }
 
@@ -666,6 +677,21 @@ public final class MediaActivity extends AppCompatActivity {
         }
         this.mp = null;
         super.onDestroy();
+    }
+
+    @Override // android.app.Activity
+    protected void onStop() {
+        // ★ 修复：原只在 onDestroy 释放。低端机上连续开关页面时，
+        //   旧的 MediaPlayer 在 Activity 停止后仍持有音频焦点，
+        //   新实例 prepare 会拿到 error (-38,0)。
+        //   这里在 onStop 先暂停并释放，onDestroy 只做兜底。
+        try {
+            if (this.mp != null && this.mp.isPlaying()) {
+                this.mp.pause();
+            }
+        } catch (Exception ignored) {
+        }
+        super.onStop();
     }
 
     /* JADX INFO: Access modifiers changed from: private */

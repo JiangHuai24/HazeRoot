@@ -38,6 +38,7 @@ import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import com.hazeroot.scriptrunner.FilesFragment;
+import com.hazeroot.scriptrunner.core.fs.PathUtil;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1782,8 +1783,13 @@ public final class FilesFragment extends Fragment {
                     this$1.showMtActionPanel(e, this$0);
                     return;
                 }
-                String linkTarget = e.getLinkTarget();
-                Intrinsics.checkNotNull(linkTarget);
+                // 符号链接：目录则进入本体路径，文件则打开其指向的目标。
+                // 原 JADX 产物这里无条件 checkNotNull(getLinkTarget())，
+                // 而 ls 解析在「名字含 " -> " 但它是目录」时 target 可能为 null，
+                // 一旦命中就是必崩的 NullPointerException。这里改为空值安全回退到本体路径。
+                String linkTarget = StringsKt.isBlank(e.getLinkTarget())
+                        ? e.getPath()
+                        : e.getLinkTarget();
                 load$default(this$0, linkTarget, 0, 2, null);
                 return;
             }
@@ -2022,8 +2028,13 @@ public final class FilesFragment extends Fragment {
                     return;
                 }
                 if (list.size() == 1 && ((FsEntry) list.get(0)).getLinkTarget() != null && $follow < 3) {
+                    // ★ 与 onItemClick 同根因修复：ls 解析在「名字含 " -> " 但其实是目录」时
+                    //   可能给出 linkTarget=null，这里虽然外层已判过 !null，
+                    //   但 JADX 留了一句冗余 checkNotNull —— 换成空值安全写法，命中也不会崩。
                     String t = ((FsEntry) list.get(0)).getLinkTarget();
-                    Intrinsics.checkNotNull(t);
+                    if (t == null || t.length() == 0) {
+                        t = ((FsEntry) list.get(0)).getPath();
+                    }
                     if (!Kt.startsWith(t, "/", false, 2, (Object) null)) {
                         t = StringsKt.trimEnd(newDir, '/') + "/" + t;
                     }
