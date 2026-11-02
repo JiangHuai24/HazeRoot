@@ -1,5 +1,6 @@
 package com.hazeroot.scriptrunner;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -2835,32 +2836,69 @@ public final class FilesFragment extends Fragment {
     }
 
     /* JADX INFO: Access modifiers changed from: private */
-    public final void openEditor(FsEntry e) {
+    public final void openEditor(final FsEntry e) {
         if (e.getIsDir()) {
             String string = getString(R.string.err_dir_edit);
             Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
             toast(string);
-        } else {
-            if (!Engine.INSTANCE.isElf(e.getPath())) {
-                startActivity(new Intent(requireContext(), (Class<?>) EditorActivity.class).putExtra("path", e.getPath()));
-                return;
-            }
-            String string2 = getString(R.string.err_elf_edit);
-            Intrinsics.checkNotNullExpressionValue(string2, "getString(...)");
-            toast(string2);
+            return;
         }
+        // 修复 ANR：isElf 会起 su 进程（含重试+sleep），必须在后台线程判定，
+        // 否则点「打开编辑器」时主线程被阻塞数秒（KernelSU 授权弹窗时必现 ANR）。
+        new Thread(new Runnable() {
+            @Override // java.lang.Runnable
+            public final void run() {
+                final boolean elf = Engine.INSTANCE.isElf(e.getPath());
+                Activity act = getActivity();
+                if (act == null) {
+                    return;
+                }
+                act.runOnUiThread(new Runnable() {
+                    @Override // java.lang.Runnable
+                    public final void run() {
+                        if (!elf) {
+                            startActivity(new Intent(requireContext(), (Class<?>) EditorActivity.class).putExtra("path", e.getPath()));
+                            return;
+                        }
+                        String string2 = getString(R.string.err_elf_edit);
+                        Intrinsics.checkNotNullExpressionValue(string2, "getString(...)");
+                        toast(string2);
+                    }
+                });
+            }
+        }).start();
     }
 
     /* JADX INFO: Access modifiers changed from: private */
-    public final void detailDialog(FsEntry e) {
-        String kind;
+    public final void detailDialog(final FsEntry e) {
         if (e.getIsDir()) {
-            kind = getString(R.string.detail_type_dir);
-        } else if (Engine.INSTANCE.isElf(e.getPath())) {
-            kind = getString(R.string.detail_type_elf);
-        } else {
-            kind = Kt.endsWith(e.getName(), ".sh", false, 2, (Object) null) ? getString(R.string.detail_type_sh) : getString(R.string.detail_type_file);
+            showDetail(e, getString(R.string.detail_type_dir));
+            return;
         }
+        // 修复 ANR：同上，isElf 移到后台线程
+        new Thread(new Runnable() {
+            @Override // java.lang.Runnable
+            public final void run() {
+                final boolean elf = Engine.INSTANCE.isElf(e.getPath());
+                Activity act = getActivity();
+                if (act == null) {
+                    return;
+                }
+                act.runOnUiThread(new Runnable() {
+                    @Override // java.lang.Runnable
+                    public final void run() {
+                        String kind = elf
+                                ? getString(R.string.detail_type_elf)
+                                : (Kt.endsWith(e.getName(), ".sh", false, 2, (Object) null) ? getString(R.string.detail_type_sh) : getString(R.string.detail_type_file));
+                        showDetail(e, kind);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /* 抽出详情弹窗，供主线程回调复用 */
+    private final void showDetail(FsEntry e, String kind) {
         Intrinsics.checkNotNull(kind);
         new AlertDialog.Builder(requireContext()).setTitle(e.getName()).setMessage(getString(R.string.detail_fmt, e.getPath(), kind, e.getPerm(), fmtSize(e.getSize()), Kt.substringBeforeLast(e.getPath(), "/", (String) null, 2, (Object) null))).setPositiveButton(getString(R.string.good), (DialogInterface.OnClickListener) null).show();
     }
