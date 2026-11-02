@@ -836,13 +836,14 @@ public final class QueueFragment extends Fragment {
         CharSequence text = textView.getText();
         Intrinsics.checkNotNull(text, "null cannot be cast to non-null type android.text.Editable");
         Editable dst = (Editable) text;
-        if (Kt.contains((CharSequence) dst, (char) 1, false, 2, (Object) null)) {
-            dst.clear();
-            this.renderedChars = 0;
-        }
+        // 修复：原 `Kt.contains(dst, '\u0001')` 是死代码——appendStyled 已把标记剥离，
+        // dst 里永远不会有 \u0001，所以这个「防裁剪错位」兜底从未生效。
+        // 改为真正有效的判据：buffer 长度比已渲染的少 = buffer 被 trimTerm 裁剪过 → 必须全量重绘。
         if (buf.length() < this.renderedChars) {
             this.renderedChars = 0;
-            dst.clear();
+            if (dst.length() > 0) {
+                dst.clear();
+            }
         }
         if (buf.length() > this.renderedChars) {
             if (this.renderedChars == 0) {
