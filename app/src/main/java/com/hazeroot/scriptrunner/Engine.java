@@ -961,11 +961,46 @@ public final class Engine {
         Intrinsics.checkNotNullExpressionValue(hex, "toLowerCase(...)");
         boolean isElf = Kt.contains((CharSequence) hex, (CharSequence) "7f454c46", false, 2, (Object) null);
 
-        // ---- 2. 决定执行方式：ELF 直接 chmod +x 执行；脚本用 sh 执行 ----
+        // ---- 2. 决定执行方式 ----
+        // 修复（R2-P0-4）：
+        //   ① shebang 语义：非 ELF 脚本先读首行 #!，有则用其解释器执行（python/busybox ash 等），
+        //      只有无 shebang 才回退 `sh`。原实现无条件 `sh path` 会无视 shebang，导致 python 等脚本语法错误。
+        //   ② 工作目录：执行前 cd 到脚本所在目录，让脚本内的相对路径（./config、cat data/x）能正常工作。
         boolean usePty = hasBusyboxScript();
-        String inner = isElf
-                ? "chmod +x " + q(s.getPath()) + " 2>/dev/null; " + q(s.getPath())
-                : "sh " + q(s.getPath());
+        String scriptPath = s.getPath();
+        String scriptDir = Kt.substringBeforeLast(scriptPath, "/", (String) null, 2, (Object) null);
+        if (scriptDir.length() == 0) {
+            scriptDir = "/";
+        }
+        String inner;
+        if (isElf) {
+            inner = "chmod +x " + q(scriptPath) + " 2>/dev/null; " + q(scriptPath);
+        } else {
+            // 探测 shebang：首行以 #! 开头则取解释器
+            String shebang = "";
+            try {
+                java.lang.Process sbp = new ProcessBuilder("su", "-c",
+                        "head -n 1 " + q(scriptPath) + " 2>/dev/null")
+                        .redirectErrorStream(true).start();
+                String first = new String(ByteStreamsKt.readBytes(sbp.getInputStream()), Charsets.UTF_8);
+                sbp.waitFor();
+                first = first.trim();
+                if (first.startsWith("#!")) {
+                    // 形如 "#!/system/bin/sh" 或 "#!/usr/bin/env python3"
+                    shebang = first.substring(2).trim();
+                }
+            } catch (Exception ignored) {
+            }
+            if (shebang.length() > 0) {
+                // 有 shebang：交给系统按首行解释器执行（等价 `exec path`，内核读 shebang）
+                inner = "chmod +x " + q(scriptPath) + " 2>/dev/null; " + q(scriptPath);
+            } else {
+                // 无 shebang：回退 sh
+                inner = "sh " + q(scriptPath);
+            }
+        }
+        // 前置 cd 到脚本目录，恢复相对路径语义
+        inner = "cd " + q(scriptDir) + " 2>/dev/null; " + inner;
         String exitProbe = "; __hr_e=$?; printf \"\n__HR_EXIT_%s__\" \"$__hr_e\"";
 
         java.lang.ProcessBuilder pb;
