@@ -42,6 +42,35 @@ public class ThermalDumpParserTest {
     }
 
     @Test
+    public void normalizeTemp_sentinelValue_isRejected() {
+        // ★ 真机 bug：高通平台未接传感器的 -273000（-273℃ 哨兵）必须被过滤成 0，
+        //   否则会被当成「最热温区」，UI 显示成乱值（实测显示 93.0℃）。
+        assertEquals(0, ThermalDumpParser.normalizeTemp(-273_000));
+        assertEquals(0, ThermalDumpParser.normalizeTemp(-127_000));
+    }
+
+    @Test
+    public void normalizeTemp_outOfPhysicalRange_isRejected() {
+        // 手机物理上不可能超过 150℃
+        assertEquals(0, ThermalDumpParser.normalizeTemp(200_000));
+        assertEquals(0, ThermalDumpParser.normalizeTemp(-50_000));
+    }
+
+    @Test
+    public void hottest_skipsInvalidSensors() {
+        // 真机实测数据片段：大量 -273000 哨兵 + 一个真实最高温 64.6℃
+        String raw =
+                "ZONE|z0|mmw3|-273000\n" +
+                "ZONE|z1|cpu-1-9|64600\n" +
+                "ZONE|z2|battery|32500\n" +
+                "----\n";
+        ThermalSnapshot s = ThermalDumpParser.parse(raw);
+        assertNotNull(s.hottest());
+        assertEquals("cpu-1-9", s.hottest().type);
+        assertEquals(64.6f, s.hottest().tempC, 0.01f);
+    }
+
+    @Test
     public void normalizeTemp_zero_staysZero() {
         assertEquals(0, ThermalDumpParser.normalizeTemp(0));
     }

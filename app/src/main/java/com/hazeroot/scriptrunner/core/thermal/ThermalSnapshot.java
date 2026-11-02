@@ -106,10 +106,13 @@ public final class ThermalSnapshot {
         return !activeCoolings().isEmpty();
     }
 
-    /** 最热的温区，取不到返回 null */
+    /** 最热的温区，跳过无效传感器；取不到返回 null */
     public Zone hottest() {
         Zone best = null;
         for (Zone z : zones) {
+            if (z.tempMilliC <= 0) {
+                continue;          // 0 = 无效/未接传感器
+            }
             if (best == null || z.tempMilliC > best.tempMilliC) {
                 best = z;
             }
@@ -119,7 +122,7 @@ public final class ThermalSnapshot {
 
     /**
      * 按关键词找温度（如 cpu / battery / gpu），找不到返回 -1。
-     * 采用「先精确 type 匹配，再忽略大小写包含匹配」两级策略。
+     * 采用「先精确 type 匹配，再忽略大小写包含匹配」两级策略，跳过无效传感器。
      */
     public float tempByKeyword(String keyword) {
         if (keyword == null || keyword.length() == 0) {
@@ -127,12 +130,12 @@ public final class ThermalSnapshot {
         }
         String k = keyword.toLowerCase(java.util.Locale.ROOT);
         for (Zone z : zones) {
-            if (z.type != null && z.type.toLowerCase(java.util.Locale.ROOT).equals(k)) {
+            if (z.tempMilliC > 0 && z.type != null && z.type.toLowerCase(java.util.Locale.ROOT).equals(k)) {
                 return z.tempC;
             }
         }
         for (Zone z : zones) {
-            if (z.type != null && z.type.toLowerCase(java.util.Locale.ROOT).contains(k)) {
+            if (z.tempMilliC > 0 && z.type != null && z.type.toLowerCase(java.util.Locale.ROOT).contains(k)) {
                 return z.tempC;
             }
         }

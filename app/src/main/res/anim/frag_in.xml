@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 页面进入：淡入 + 从下方轻微上移 6dp（180ms，decelerate）
+     克制的过渡，不抢戏；比 hide/show 的硬切自然 -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:anim/decelerate_interpolator">
+    <alpha
+        android:fromAlpha="0.0"
+        android:toAlpha="1.0"
+        android:duration="180" />
+    <translate
+        android:fromYDelta="2%"
+        android:toYDelta="0%"
+        android:duration="180" />
+</set>

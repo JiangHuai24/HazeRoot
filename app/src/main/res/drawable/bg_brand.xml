@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape
-  xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- 品牌徽标：黑底 + 淡色描边，使方块在深色背景上也能看见轮廓 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
     <solid android:color="#ff0b0b0b" />
     <corners android:radius="9.0dip" />
+    <stroke android:width="1.0dip" android:color="#33FFFFFF" />
 </shape>

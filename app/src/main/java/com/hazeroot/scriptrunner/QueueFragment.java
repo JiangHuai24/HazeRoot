@@ -133,34 +133,20 @@ public final class QueueFragment extends Fragment {
                 store3.saveScripts(requireContext3, Engine.INSTANCE.getScripts());
             }
         }
-        View findViewById = v.findViewById(R.id.termView);
-        Intrinsics.checkNotNullExpressionValue(findViewById, "findViewById(...)");
-        this.term = (TextView) findViewById;
-        TextView textView = this.term;
-        View view = null;
-        if (textView == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("term");
-            textView = null;
+        // 终端相关控件已迁到 TerminalFragment，本页布局不再包含它们。
+        // 这里改成安全查找（允许 null），相关逻辑全部加空判断，避免 NPE。
+        this.term = (TextView) v.findViewById(R.id.termView);
+        if (this.term != null) {
+            this.term.setText("", TextView.BufferType.EDITABLE);
         }
-        textView.setText("", TextView.BufferType.EDITABLE);
-        View findViewById2 = v.findViewById(R.id.termScroll);
-        Intrinsics.checkNotNullExpressionValue(findViewById2, "findViewById(...)");
-        this.termScroll = (ScrollView) findViewById2;
-        View findViewById3 = v.findViewById(R.id.promptRow);
-        Intrinsics.checkNotNullExpressionValue(findViewById3, "findViewById(...)");
-        this.promptRow = findViewById3;
-        View findViewById4 = v.findViewById(R.id.promptView);
-        Intrinsics.checkNotNullExpressionValue(findViewById4, "findViewById(...)");
-        this.promptView = (TextView) findViewById4;
-        View findViewById5 = v.findViewById(R.id.manualInput);
-        Intrinsics.checkNotNullExpressionValue(findViewById5, "findViewById(...)");
-        this.manualInput = (EditText) findViewById5;
+        this.termScroll = (ScrollView) v.findViewById(R.id.termScroll);
+        this.promptRow = v.findViewById(R.id.promptRow);
+        this.promptView = (TextView) v.findViewById(R.id.promptView);
+        this.manualInput = (EditText) v.findViewById(R.id.manualInput);
         View findViewById6 = v.findViewById(R.id.btnRun);
         Intrinsics.checkNotNullExpressionValue(findViewById6, "findViewById(...)");
         this.btnRun = (Button) findViewById6;
-        View findViewById7 = v.findViewById(R.id.btnStop);
-        Intrinsics.checkNotNullExpressionValue(findViewById7, "findViewById(...)");
-        this.btnStop = (ImageView) findViewById7;
+        this.btnStop = (ImageView) v.findViewById(R.id.btnStop);
         View findViewById8 = v.findViewById(R.id.rootBadge);
         Intrinsics.checkNotNullExpressionValue(findViewById8, "findViewById(...)");
         this.rootBadge = findViewById8;
@@ -170,9 +156,7 @@ public final class QueueFragment extends Fragment {
         View findViewById10 = v.findViewById(R.id.rootText);
         Intrinsics.checkNotNullExpressionValue(findViewById10, "findViewById(...)");
         this.rootText = (TextView) findViewById10;
-        View findViewById11 = v.findViewById(R.id.btnTheme);
-        Intrinsics.checkNotNullExpressionValue(findViewById11, "findViewById(...)");
-        this.themeIcon = (ImageView) findViewById11;
+        this.themeIcon = (ImageView) v.findViewById(R.id.btnTheme);
         View findViewById12 = v.findViewById(R.id.summaryText);
         Intrinsics.checkNotNullExpressionValue(findViewById12, "findViewById(...)");
         this.summaryText = (TextView) findViewById12;
@@ -183,19 +167,14 @@ public final class QueueFragment extends Fragment {
         Intrinsics.checkNotNullExpressionValue(findViewById14, "findViewById(...)");
         this.recycler = (RecyclerView) findViewById14;
         syncTerm();
-        TextView textView2 = this.promptView;
-        if (textView2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("promptView");
-            textView2 = null;
+        // 终端要素已迁到 TerminalFragment，本页可能不存在这些控件
+        if (this.promptView != null) {
+            this.promptView.setText(Engine.INSTANCE.getLastPromptText());
         }
-        textView2.setText(Engine.INSTANCE.getLastPromptText());
-        View view2 = this.promptRow;
-        if (view2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("promptRow");
-            view2 = null;
+        if (this.promptRow != null) {
+            this.promptRow.setVisibility(Engine.INSTANCE.getLastPromptText().length() == 0 ? 8 : 0);
         }
-        view2.setVisibility(Engine.INSTANCE.getLastPromptText().length() == 0 ? 8 : 0);
-        if (Engine.INSTANCE.isTermEmpty()) {
+        if (Engine.INSTANCE.isTermEmpty() && this.term != null) {
             printWelcome();
         }
         syncTerm();
@@ -294,48 +273,49 @@ public final class QueueFragment extends Fragment {
             }
         });
         fitQueue();
-        ((TextView) v.findViewById(R.id.btnAdd)).setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda4
-            @Override // android.view.View.OnClickListener
-            public final void onClick(View view3) {
-                QueueFragment.onViewCreated$lambda$1(QueueFragment.this, view3);
-            }
-        });
-        v.findViewById(R.id.btnSend).setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda7
-            @Override // android.view.View.OnClickListener
-            public final void onClick(View view3) {
-                QueueFragment.onViewCreated$lambda$2(QueueFragment.this, view3);
-            }
-        });
-        EditText editText = this.manualInput;
-        if (editText == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("manualInput");
-            editText = null;
+        View btnAddV = v.findViewById(R.id.btnAdd);
+        if (btnAddV != null) {
+            btnAddV.setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda4
+                @Override // android.view.View.OnClickListener
+                public final void onClick(View view3) {
+                    QueueFragment.onViewCreated$lambda$1(QueueFragment.this, view3);
+                }
+            });
         }
-        editText.setOnEditorActionListener(new TextView.OnEditorActionListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda8
-            @Override // android.widget.TextView.OnEditorActionListener
-            public final boolean onEditorAction(TextView textView3, int i, KeyEvent keyEvent) {
-                boolean onViewCreated$lambda$3;
-                onViewCreated$lambda$3 = QueueFragment.onViewCreated$lambda$3(QueueFragment.this, textView3, i, keyEvent);
-                return onViewCreated$lambda$3;
-            }
-        });
-        ImageView imageView = this.btnStop;
-        if (imageView == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("btnStop");
-            imageView = null;
+        View btnSendV = v.findViewById(R.id.btnSend);
+        if (btnSendV != null) {
+            btnSendV.setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda7
+                @Override // android.view.View.OnClickListener
+                public final void onClick(View view3) {
+                    QueueFragment.onViewCreated$lambda$2(QueueFragment.this, view3);
+                }
+            });
         }
-        imageView.setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda9
-            @Override // android.view.View.OnClickListener
-            public final void onClick(View view3) {
-                QueueFragment.onViewCreated$lambda$4(QueueFragment.this, view3);
-            }
-        });
-        ((TextView) v.findViewById(R.id.btnClear)).setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda10
-            @Override // android.view.View.OnClickListener
-            public final void onClick(View view3) {
-                QueueFragment.onViewCreated$lambda$5(QueueFragment.this, view3);
-            }
-        });
+        if (this.manualInput != null) {
+            this.manualInput.setOnEditorActionListener(new TextView.OnEditorActionListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda8
+                @Override // android.widget.TextView.OnEditorActionListener
+                public final boolean onEditorAction(TextView textView3, int i, KeyEvent keyEvent) {
+                    return QueueFragment.onViewCreated$lambda$3(QueueFragment.this, textView3, i, keyEvent);
+                }
+            });
+        }
+        if (this.btnStop != null) {
+            this.btnStop.setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda9
+                @Override // android.view.View.OnClickListener
+                public final void onClick(View view3) {
+                    QueueFragment.onViewCreated$lambda$4(QueueFragment.this, view3);
+                }
+            });
+        }
+        View clearV = v.findViewById(R.id.btnClear);
+        if (clearV != null) {
+            clearV.setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda10
+                @Override // android.view.View.OnClickListener
+                public final void onClick(View view3) {
+                    QueueFragment.onViewCreated$lambda$5(QueueFragment.this, view3);
+                }
+            });
+        }
         Button button = this.btnRun;
         if (button == null) {
             Intrinsics.throwUninitializedPropertyAccessException("btnRun");
@@ -353,11 +333,12 @@ public final class QueueFragment extends Fragment {
         View findViewById16 = v.findViewById(R.id.scriptsBody);
         Intrinsics.checkNotNullExpressionValue(findViewById16, "findViewById(...)");
         this.scriptsBody = findViewById16;
-        View findViewById17 = v.findViewById(R.id.toggleArrow);
-        Intrinsics.checkNotNullExpressionValue(findViewById17, "findViewById(...)");
-        this.toggleArrow = (TextView) findViewById17;
-        this.scriptsCollapsed = requireContext().getSharedPreferences("ui_prefs", 0).getBoolean("scripts_collapsed", false);
-        setCollapsed(this.scriptsCollapsed);
+        // 新布局无折叠箭头（队列与方案库同页，无需折叠）
+        this.toggleArrow = (TextView) v.findViewById(R.id.toggleArrow);
+        // 新设计：队列与方案库同页，列表默认全展开、不再折叠
+        // （原先折叠态会导致脚本列表只显示一行摘要，用户看不到队列内容）
+        this.scriptsCollapsed = false;
+        setCollapsed(false);
         View view3 = this.scriptsHeader;
         if (view3 == null) {
             Intrinsics.throwUninitializedPropertyAccessException("scriptsHeader");
@@ -369,17 +350,14 @@ public final class QueueFragment extends Fragment {
                 QueueFragment.onViewCreated$lambda$7(QueueFragment.this, view4);
             }
         });
-        EditText editText2 = this.manualInput;
-        if (editText2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("manualInput");
-            editText2 = null;
+        if (this.manualInput != null) {
+            this.manualInput.setOnFocusChangeListener(new View.OnFocusChangeListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda14
+                @Override // android.view.View.OnFocusChangeListener
+                public final void onFocusChange(View view4, boolean z) {
+                    QueueFragment.onViewCreated$lambda$8(QueueFragment.this, view4, z);
+                }
+            });
         }
-        editText2.setOnFocusChangeListener(new View.OnFocusChangeListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda14
-            @Override // android.view.View.OnFocusChangeListener
-            public final void onFocusChange(View view4, boolean z) {
-                QueueFragment.onViewCreated$lambda$8(QueueFragment.this, view4, z);
-            }
-        });
         refreshThemeButton();
         refreshButtons();
         ImageView imageView2 = this.themeIcon;
@@ -394,37 +372,94 @@ public final class QueueFragment extends Fragment {
             }
         });
         View view4 = this.rootBadge;
-        if (view4 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("rootBadge");
-        } else {
-            view = view4;
+        if (view4 != null) {
+            view4.setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda16
+                @Override // android.view.View.OnClickListener
+                public final void onClick(View view5) {
+                    QueueFragment.onViewCreated$lambda$10(QueueFragment.this, view5);
+                }
+            });
         }
-        view.setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda16
-            @Override // android.view.View.OnClickListener
-            public final void onClick(View view5) {
-                QueueFragment.onViewCreated$lambda$10(QueueFragment.this, view5);
-            }
-        });
         threadRootCheck();
-        v.findViewById(R.id.btnLang).setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda5
-            @Override // android.view.View.OnClickListener
-            public final void onClick(View view5) {
-                QueueFragment.onViewCreated$lambda$11(QueueFragment.this, view5);
-            }
-        });
-        v.findViewById(R.id.btnGuide).setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda6
-            @Override // android.view.View.OnClickListener
-            public final void onClick(View view5) {
-                QueueFragment.onViewCreated$lambda$12(QueueFragment.this, view5);
-            }
-        });
+        View btnLangV = v.findViewById(R.id.btnLang);
+        if (btnLangV != null) {
+            btnLangV.setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda5
+                @Override // android.view.View.OnClickListener
+                public final void onClick(View view5) {
+                    QueueFragment.onViewCreated$lambda$11(QueueFragment.this, view5);
+                }
+            });
+        }
+        View btnGuideV = v.findViewById(R.id.btnGuide);
+        if (btnGuideV != null) {
+            btnGuideV.setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.QueueFragment$$ExternalSyntheticLambda6
+                @Override // android.view.View.OnClickListener
+                public final void onClick(View view5) {
+                    QueueFragment.onViewCreated$lambda$12(QueueFragment.this, view5);
+                }
+            });
+        }
         // 设备页入口：设备信息 + 温度/限频 + 温控开关 + 屏幕刷新率
-        v.findViewById(R.id.btnDevice).setOnClickListener(new View.OnClickListener() {
-            @Override // android.view.View.OnClickListener
-            public final void onClick(View view) {
-                startActivity(new android.content.Intent(requireContext(), (Class<?>) DeviceActivity.class));
-            }
-        });
+        View btnDeviceV = v.findViewById(R.id.btnDevice);
+        if (btnDeviceV != null) {
+            btnDeviceV.setOnClickListener(new View.OnClickListener() {
+                @Override // android.view.View.OnClickListener
+                public final void onClick(View view) {
+                    startActivity(new android.content.Intent(requireContext(), (Class<?>) DeviceActivity.class));
+                }
+            });
+        }
+        // 溢出菜单：原先三个点完全没绑事件（点了无反应），这里补上
+        View btnMoreV = v.findViewById(R.id.btnMore);
+        if (btnMoreV != null) {
+            btnMoreV.setOnClickListener(new View.OnClickListener() {
+                @Override // android.view.View.OnClickListener
+                public final void onClick(View anchor) {
+                    showOverflowMenu(anchor);
+                }
+            });
+        }
+    }
+
+    /** 顶栏溢出菜单：把原来占位的 ? / 中EN / 月亮 三个按钮收进来 */
+    private void showOverflowMenu(View anchor) {
+        try {
+            android.widget.PopupMenu pm = new android.widget.PopupMenu(requireContext(), anchor);
+            pm.getMenu().add(0, 1, 0, R.string.menu_manual);
+            pm.getMenu().add(0, 2, 1, R.string.menu_lang);
+            pm.getMenu().add(0, 3, 2, R.string.menu_theme);
+            pm.getMenu().add(0, 4, 3, R.string.menu_device);
+            pm.setOnMenuItemClickListener(item -> {
+                int id = item.getItemId();
+                if (id == 1) {
+                    startActivity(new android.content.Intent(requireContext(), (Class<?>) ManualActivity.class));
+                } else if (id == 2) {
+                    onViewCreated$lambda$11(QueueFragment.this, anchor);
+                } else if (id == 3) {
+                    View themeBtn = getView() != null ? getView().findViewById(R.id.btnTheme) : null;
+                    if (themeBtn != null) {
+                        themeBtn.performClick();
+                    } else {
+                        // 顶栏月亮按钮已隐藏：直接切换日夜
+                        androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+                                isNightMode()
+                                        ? androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+                                        : androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES);
+                    }
+                } else if (id == 4) {
+                    startActivity(new android.content.Intent(requireContext(), (Class<?>) DeviceActivity.class));
+                }
+                return true;
+            });
+            pm.show();
+        } catch (Exception e) {
+            toast("菜单打开失败：" + e.getMessage());
+        }
+    }
+
+    private boolean isNightMode() {
+        int mode = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+        return mode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -434,11 +469,10 @@ public final class QueueFragment extends Fragment {
     }
 
     private static final void onViewCreated$sendManual(QueueFragment this$0) {
+        // 输入框已迁到 TerminalFragment；本页无输入框时直接忽略
         EditText editText = this$0.manualInput;
-        EditText editText2 = null;
         if (editText == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("manualInput");
-            editText = null;
+            return;
         }
         String x = editText.getText().toString();
         if (x.length() == 0) {
@@ -449,13 +483,7 @@ public final class QueueFragment extends Fragment {
             Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
             this$0.toast(string);
         } else if (Engine.INSTANCE.sendRaw(x)) {
-            EditText editText3 = this$0.manualInput;
-            if (editText3 == null) {
-                Intrinsics.throwUninitializedPropertyAccessException("manualInput");
-            } else {
-                editText2 = editText3;
-            }
-            editText2.setText("");
+            editText.setText("");
         }
     }
 
@@ -496,15 +524,44 @@ public final class QueueFragment extends Fragment {
     }
 
     /* JADX INFO: Access modifiers changed from: private */
-    public static final void onViewCreated$lambda$6(QueueFragment this$0, View it) {
+    public static final void onViewCreated$lambda$6(final QueueFragment this$0, View it) {
         Intrinsics.checkNotNullParameter(this$0, "this$0");
-        if (!Engine.INSTANCE.getScripts().isEmpty()) {
-            this$0.tryStartQueue();
+        if (Engine.INSTANCE.getScripts().isEmpty()) {
+            String string = this$0.getString(R.string.empty_queue_toast);
+            Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
+            this$0.toast(string);
             return;
         }
-        String string = this$0.getString(R.string.empty_queue_toast);
-        Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
-        this$0.toast(string);
+        // ★ 防误触：root 脚本执行前必须二次确认
+        //   QA 报告：点击路径意外拉起整个队列，执行了第三方脚本。
+        final java.util.List<ScriptItem> list = Engine.INSTANCE.getScripts();
+        StringBuilder names = new StringBuilder();
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) {
+                names.append("\n");
+            }
+            names.append(i + 1).append(". ").append(list.get(i).getName());
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this$0.requireContext())
+                .setTitle(R.string.run_confirm_title)
+                .setMessage(this$0.getString(R.string.run_confirm_queue_fmt, list.size(), names.toString()))
+                .setPositiveButton(R.string.run_now, (d, w) -> {
+                    this$0.jumpToTerminal();
+                    this$0.tryStartQueue();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /** 切到「终端」Tab（执行前调用，让用户直接看到实时输出） */
+    private void jumpToTerminal() {
+        try {
+            android.app.Activity act = getActivity();
+            if (act instanceof MainActivity) {
+                ((MainActivity) act).switchTo(R.id.navTerminal);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -631,6 +688,30 @@ public final class QueueFragment extends Fragment {
     public void onPause() {
         Engine.INSTANCE.removeListener(this.uiListener);
         super.onPause();
+    }
+
+    /**
+     * 视图销毁时（Activity 重建 / Fragment 被移除）必须反注册监听器。
+     * QA 报告 P0-3：Engine 是进程级单例，若只在 onPause 反注册，
+     * 而 hide/show 不触发 onPause，监听器会一直存活并在视图已销毁后回调 → lateinit 崩溃。
+     */
+    @Override // androidx.fragment.app.Fragment
+    public void onDestroyView() {
+        Engine.INSTANCE.removeListener(this.uiListener);
+        this.term = null;
+        this.termScroll = null;
+        this.promptView = null;
+        this.promptRow = null;
+        this.manualInput = null;
+        this.btnStop = null;
+        this.countBadge = null;
+        this.summaryText = null;
+        this.toggleArrow = null;
+        this.themeIcon = null;
+        this.rootBadge = null;
+        this.rootDot = null;
+        this.rootText = null;
+        super.onDestroyView();
     }
 
     private final void addFlow() {
@@ -760,37 +841,18 @@ public final class QueueFragment extends Fragment {
     }
 
     private final void setCollapsed(boolean c) {
-        this.scriptsCollapsed = c;
-        View view = this.scriptsBody;
-        TextView textView = null;
-        if (view == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("scriptsBody");
-            view = null;
+        // 新设计不再支持折叠：始终展开列表、始终隐藏摘要行
+        c = false;
+        this.scriptsCollapsed = false;
+        if (this.scriptsBody != null) {
+            this.scriptsBody.setVisibility(View.VISIBLE);
         }
-        view.setVisibility(c ? 8 : 0);
-        TextView textView2 = this.summaryText;
-        if (textView2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("summaryText");
-            textView2 = null;
+        if (this.summaryText != null) {
+            this.summaryText.setVisibility(View.GONE);
         }
-        textView2.setVisibility(c ? 0 : 8);
-        if (c) {
-            fillSummary();
+        if (this.toggleArrow != null) {
+            this.toggleArrow.setVisibility(View.GONE);
         }
-        TextView textView3 = this.toggleArrow;
-        if (textView3 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("toggleArrow");
-            textView3 = null;
-        }
-        textView3.setText(c ? "›" : "▾");
-        TextView textView4 = this.toggleArrow;
-        if (textView4 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("toggleArrow");
-        } else {
-            textView = textView4;
-        }
-        textView.setContentDescription(getString(c ? R.string.expand_queue : R.string.collapse_queue));
-        requireContext().getSharedPreferences("ui_prefs", 0).edit().putBoolean("scripts_collapsed", c).apply();
     }
 
     private final void fillSummary() {
@@ -838,11 +900,13 @@ public final class QueueFragment extends Fragment {
         TextView textView = this.term;
         ScrollView scrollView = null;
         if (textView == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("term");
-            textView = null;
+            // 终端已迁到 TerminalFragment，本页没有 termView —— 直接返回，不渲染
+            return;
         }
         CharSequence text = textView.getText();
-        Intrinsics.checkNotNull(text, "null cannot be cast to non-null type android.text.Editable");
+        if (!(text instanceof Editable)) {
+            return;
+        }
         Editable dst = (Editable) text;
         // 修复：原 `Kt.contains(dst, '\u0001')` 是死代码——appendStyled 已把标记剥离，
         // dst 里永远不会有 \u0001，所以这个「防裁剪错位」兜底从未生效。
@@ -1023,13 +1087,16 @@ public final class QueueFragment extends Fragment {
 
     /* JADX INFO: Access modifiers changed from: private */
     public final void refreshButtons() {
+        // 纯 UI 刷新：控件缺失（布局改版后）直接跳过，不应崩溃
+        if (this.btnRun == null || this.btnStop == null) {
+            return;
+        }
         String string;
         String string2;
         Button button = this.btnRun;
         ImageView imageView = null;
         if (button == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("btnRun");
-            button = null;
+            return;
         }
         button.setEnabled(!Engine.INSTANCE.getRunningNow());
         Button button2 = this.btnRun;

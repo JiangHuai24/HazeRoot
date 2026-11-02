@@ -120,62 +120,59 @@ public final class MainActivity extends AppCompatActivity {
         Intrinsics.checkNotNullExpressionValue(registerForActivityResult, "registerForActivityResult(...)");
         this.onboardNotiLauncher = registerForActivityResult;
         maybeOnboardPermissions(savedInstanceState == null);
-        this.queue = new QueueFragment();
-        this.files = new FilesFragment();
-        this.presets = new PresetsFragment();
-        this.home = new HomeFragment();
-        this.terminal = new TerminalFragment();
-        FragmentTransaction beginTransaction = getSupportFragmentManager().beginTransaction();
-        int i = R.id.navContainer;
-        QueueFragment queueFragment = this.queue;
-        PresetsFragment presetsFragment = null;
-        if (queueFragment == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("queue");
-            queueFragment = null;
-        }
-        FragmentTransaction add = beginTransaction.add(i, queueFragment, "queue");
-        int i2 = R.id.navContainer;
-        FilesFragment filesFragment = this.files;
-        if (filesFragment == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("files");
-            filesFragment = null;
-        }
-        FragmentTransaction add2 = add.add(i2, filesFragment, "files");
-        int i3 = R.id.navContainer;
-        PresetsFragment presetsFragment2 = this.presets;
-        if (presetsFragment2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("presets");
-            presetsFragment2 = null;
-        }
-        FragmentTransaction add3 = add2.add(i3, presetsFragment2, "presets");
-        // 新增两个页面：首页 / 终端
-        if (this.home != null) {
-            add3 = add3.add(R.id.navContainer, this.home, "home");
-        }
-        if (this.terminal != null) {
-            add3 = add3.add(R.id.navContainer, this.terminal, "terminal");
-        }
-        FilesFragment filesFragment2 = this.files;
-        if (filesFragment2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("files");
-            filesFragment2 = null;
-        }
-        FragmentTransaction hide = add3.hide(filesFragment2);
-        PresetsFragment presetsFragment3 = this.presets;
-        if (presetsFragment3 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("presets");
+        // ★ 修复旋转/重建导致的 Fragment 重复 add（5 个变 10 个、双层叠影、双监听器）
+        //   重建时优先从 FragmentManager 找回已有实例；只有首次创建才 add。
+        androidx.fragment.app.FragmentManager fm = getSupportFragmentManager();
+        if (savedInstanceState != null) {
+            android.util.Log.d("HazeRoot", "重建：复用已有 Fragment 实例");
         } else {
-            presetsFragment = presetsFragment3;
+            this.queue = new QueueFragment();
+            this.files = new FilesFragment();
+            this.presets = new PresetsFragment();
+            this.home = new HomeFragment();
+            this.terminal = new TerminalFragment();
         }
-        hide = hide.hide(presetsFragment);
-        // 新页面初始也隐藏（首屏落在队列页）
-        if (this.home != null) {
-            hide = hide.hide(this.home);
+        // 重建时从 FragmentManager 找回已有实例（按 tag），避免重复 add
+        if (savedInstanceState != null) {
+            this.queue = (QueueFragment) fm.findFragmentByTag("queue");
+            this.files = (FilesFragment) fm.findFragmentByTag("files");
+            this.presets = (PresetsFragment) fm.findFragmentByTag("presets");
+            this.home = (HomeFragment) fm.findFragmentByTag("home");
+            this.terminal = (TerminalFragment) fm.findFragmentByTag("terminal");
         }
-        if (this.terminal != null) {
-            hide = hide.hide(this.terminal);
+        boolean firstCreate = (savedInstanceState == null);
+        FragmentTransaction beginTransaction = fm.beginTransaction();
+        if (firstCreate) {
+            if (this.queue != null) {
+                beginTransaction.add(R.id.navContainer, this.queue, "queue");
+            }
+            if (this.files != null) {
+                beginTransaction.add(R.id.navContainer, this.files, "files");
+            }
+            if (this.presets != null) {
+                beginTransaction.add(R.id.navContainer, this.presets, "presets");
+            }
+            if (this.home != null) {
+                beginTransaction.add(R.id.navContainer, this.home, "home");
+            }
+            if (this.terminal != null) {
+                beginTransaction.add(R.id.navContainer, this.terminal, "terminal");
+            }
+            // 首次创建后统一隐藏非首屏页面
+            if (this.files != null) {
+                beginTransaction.hide(this.files);
+            }
+            if (this.presets != null) {
+                beginTransaction.hide(this.presets);
+            }
+            if (this.home != null) {
+                beginTransaction.hide(this.home);
+            }
+            if (this.terminal != null) {
+                beginTransaction.hide(this.terminal);
+            }
+            beginTransaction.commitNow();
         }
-        hide.commit();
         View findViewById = findViewById(R.id.bottomNav);
         Intrinsics.checkNotNullExpressionValue(findViewById, "findViewById(...)");
         this.navIsland = findViewById;
@@ -323,12 +320,14 @@ public final class MainActivity extends AppCompatActivity {
     /* JADX INFO: Access modifiers changed from: private */
     public static final void onCreate$lambda$3(MainActivity this$0, View $container, int $fullH, View view, int i, int i2, int i3, int i4, int i5, int i6, int i7, int i8) {
         Intrinsics.checkNotNullParameter(this$0, "this$0");
-        View view2 = this$0.navIsland;
-        if (view2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("navIsland");
-            view2 = null;
+        // ★ 修复：原先按「容器高度 < 全屏 72%」隐藏导航，用来判断"键盘弹起"。
+        //   但执行脚本后终端内容 + 输入法会让容器变矮，导航被隐藏后再也不会恢复，
+        //   导致用户卡在终端页切不出去。底部导航现在是悬浮胶囊、占高很小，
+        //   键盘弹起也不会遮挡内容，因此**始终显示**。
+        View nav = this$0.navIsland;
+        if (nav != null && nav.getVisibility() != View.VISIBLE) {
+            nav.setVisibility(View.VISIBLE);
         }
-        view2.setVisibility(((float) $container.getHeight()) < ((float) $fullH) * 0.72f ? 8 : 0);
     }
 
     private final void selectTab(int id) {
@@ -338,6 +337,10 @@ public final class MainActivity extends AppCompatActivity {
             int tid = element$iv.getKey().intValue();
             Tab tab = element$iv.getValue();
             setTabActive(tab, tid == id);
+        }
+        // ★ 文件页空间紧张：进入文件页时隐藏底部导航，改用左上角返回
+        if (navIsland != null) {
+            navIsland.setVisibility(id == R.id.tabFiles ? View.GONE : View.VISIBLE);
         }
         Function0<Fragment> function0 = this.tabFragments.get(Integer.valueOf(id));
         if (function0 == null || (invoke = function0.invoke()) == null) {
@@ -378,68 +381,59 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private final void show(Fragment f) {
+        if (f == null) {
+            return;
+        }
         FragmentTransaction tx = getSupportFragmentManager().beginTransaction();
-        Intrinsics.checkNotNullExpressionValue(tx, "beginTransaction(...)");
-        Fragment[] fragmentArr = new Fragment[5];
-        QueueFragment queueFragment = this.queue;
-        FilesFragment filesFragment = null;
-        if (queueFragment == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("queue");
-            queueFragment = null;
-        }
-        fragmentArr[0] = queueFragment;
-        FilesFragment filesFragment2 = this.files;
-        if (filesFragment2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("files");
-            filesFragment2 = null;
-        }
-        fragmentArr[1] = filesFragment2;
-        PresetsFragment presetsFragment = this.presets;
-        if (presetsFragment == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("presets");
-            presetsFragment = null;
-        }
-        fragmentArr[2] = presetsFragment;
-        fragmentArr[3] = this.home;
-        fragmentArr[4] = this.terminal;
-        Iterable $this$forEach$iv = CollectionsKt.listOfNotNull((Object[]) fragmentArr);
-        for (Object element$iv : $this$forEach$iv) {
-            Fragment it = (Fragment) element$iv;
+        // 导航过渡动画：淡入淡出 + 轻微上移（200ms），替代原来 hide/show 的生硬切换。
+        // 用自定义动画而非 FragmentTransaction 默认动画，避免与 hide/show 冲突。
+        tx.setCustomAnimations(
+                R.anim.frag_in,    // enter
+                R.anim.frag_out,   // exit
+                0,                 // popEnter
+                0);                // popExit
+        // 用 listOfNotNull 过滤掉未创建的页面
+        Fragment[] arr = new Fragment[]{this.queue, this.files, this.presets, this.home, this.terminal};
+        for (Fragment it : CollectionsKt.listOfNotNull(arr)) {
             if (it != f) {
                 tx.hide(it);
             }
         }
-        tx.show(f).commit();
-        getSupportFragmentManager().executePendingTransactions();
-        FilesFragment filesFragment3 = this.files;
-        if (filesFragment3 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("files");
-            filesFragment3 = null;
-        }
-        if (f != filesFragment3) {
-            FilesFragment filesFragment4 = this.files;
-            if (filesFragment4 == null) {
-                Intrinsics.throwUninitializedPropertyAccessException("files");
-            } else {
-                filesFragment = filesFragment4;
+        tx.show(f);
+        try {
+            tx.commitNow();
+        } catch (Exception e) {
+            android.util.Log.e("HazeRoot", "show() commit 失败", e);
+            try {
+                tx.commitAllowingStateLoss();
+            } catch (Exception ignored) {
             }
-            filesFragment.resetPickMode();
+        }
+        if (f != this.files && this.files != null) {
+            this.files.resetPickMode();
+        }
+    }
+
+    /** 供页面控制底部导航显隐（文件页需要更多竖向空间） */
+    public final void setBottomNavVisible(boolean visible) {
+        if (this.navIsland != null) {
+            this.navIsland.setVisibility(visible ? View.VISIBLE : View.GONE);
         }
     }
 
     public final void switchTo(int itemId) {
-        if (itemId != R.id.navQueue) {
-            if (itemId != R.id.navFiles) {
-                if (itemId == R.id.navPresets) {
-                    selectTab(R.id.tabPresets);
-                    return;
-                }
-                return;
-            }
+        if (itemId == R.id.navQueue) {
+            selectTab(R.id.tabQueue);
+        } else if (itemId == R.id.navFiles) {
             selectTab(R.id.tabFiles);
-            return;
+        } else if (itemId == R.id.navTerminal) {
+            selectTab(R.id.tabTerminal);
+        } else if (itemId == R.id.navHome) {
+            selectTab(R.id.tabHome);
+        } else if (itemId == R.id.navPresets) {
+            // 方案库已融合进队列页
+            selectTab(R.id.tabQueue);
         }
-        selectTab(R.id.tabQueue);
     }
 
     public final QueueFragment queueFragment() {

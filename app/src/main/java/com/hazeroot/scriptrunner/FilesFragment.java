@@ -80,6 +80,12 @@ public final class FilesFragment extends Fragment {
     private View expandedFg;
     private String expandedTag;
     private boolean gestureBusy;
+    /**
+     * 长按触发后到此刻为止，屏蔽 onItemClick。
+     * ListView 会在 ACTION_UP 时自行派发点击事件，fg 的 onTouch 返回 true 无法阻止，
+     * 所以必须按时间戳屏蔽，避免「长按弹面板的同时又弹一次执行确认」。
+     */
+    private long[] mtSuppressClickUntil;
     private View multiBar;
     private TextView multiCount;
     private boolean multiMode;
@@ -214,6 +220,21 @@ public final class FilesFragment extends Fragment {
         View findViewById4 = v.findViewById(R.id.btnNew);
         Intrinsics.checkNotNullExpressionValue(findViewById4, "findViewById(...)");
         this.btnNew = findViewById4;
+
+        // 左上角「☰」：文件页隐藏了底部导航，靠它回队列页 + 打开更多菜单
+        View backV = v.findViewById(R.id.btnFilesBack);
+        if (backV != null) {
+            backV.setOnClickListener(view2 -> showMtMainMenu());
+        }
+
+        // 右上角「⋮」溢出菜单
+        View overflowV = v.findViewById(R.id.btnOverflow);
+        if (overflowV != null) {
+            overflowV.setOnClickListener(view2 -> showMtOverflowMenu());
+        }
+
+        // 底部工具栏 5 个按钮（MT 风格）
+        bindBottomBar(v);
         List<Pane> list = this.panes;
         View findViewById5 = v.findViewById(R.id.btnUpA);
         Intrinsics.checkNotNullExpressionValue(findViewById5, "findViewById(...)");
@@ -262,6 +283,18 @@ public final class FilesFragment extends Fragment {
                 FilesFragment.onViewCreated$lambda$2(FilesFragment.this, view2);
             }
         });
+        // 取消全选：清空选择并退出多选
+        View noneBtn = v.findViewById(R.id.mBtnNone);
+        if (noneBtn != null) {
+            noneBtn.setOnClickListener(view2 -> {
+                selected.clear();
+                Pane sp = selPane;
+                if (sp != null) {
+                    sp.refreshSel();
+                }
+                exitMulti();
+            });
+        }
         ((TextView) v.findViewById(R.id.mBtnCopy)).setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda25
             @Override // android.view.View.OnClickListener
             public final void onClick(View view2) {
@@ -476,6 +509,603 @@ public final class FilesFragment extends Fragment {
             p.getPathView().setBackgroundResource(this.panes.indexOf(p) == this.activeIdx ? R.drawable.bg_pick_hint : R.drawable.bg_quick_chip);
         }
         refreshQuickSelection();
+    }
+
+    /**
+     * MT 风格的浮动操作面板（按用户录屏 1:1 复刻）。
+     *
+     * 布局：两列网格，每项 = 图标 + 文字
+     *   复制 ->   |  移动 ->
+     *   删除      |  重命名
+     *   工具      |  压缩
+     *   属性      |  分享
+     *   打开方式.. |  添加书签
+     * 顶部提示条：「ⓘ 带 ⬤ 的菜单表示可以长按触发单窗口操作」
+     * 用 BottomSheetDialog，浮在列表上方、半透明深色圆角，不遮挡整屏。
+     */
+    private void showMtActionPanel(final FsEntry e, final Pane pane) {
+        if (e == null || getContext() == null) {
+            return;
+        }
+        // ★ 以 MT 录屏为准：弹窗是**屏幕正中的悬浮面板**（不是底部 sheet）。
+        //   圆角 + 深色半透明背景 + 宽度约屏宽 88%，浮在列表上方。
+        final android.app.Dialog dialog = new android.app.Dialog(requireContext());
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setCanceledOnTouchOutside(true);
+
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bg_mt_panel);
+        root.setClipToOutline(true);
+
+        // ---- 仅保留右上角关闭「×」，去掉文字提示 ----
+        LinearLayout tip = new LinearLayout(requireContext());
+        tip.setOrientation(LinearLayout.HORIZONTAL);
+        tip.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
+        tip.setPadding(dp(6), dp(4), dp(6), dp(4));
+
+        TextView tipClose = new TextView(requireContext());
+        tipClose.setText("×");
+        tipClose.setTextSize(18);
+        tipClose.setTextColor(0xFFB8BCC8);
+        tipClose.setGravity(android.view.Gravity.CENTER);
+        tipClose.setPadding(dp(10), dp(2), dp(10), dp(2));
+        tipClose.setOnClickListener(v -> dialog.dismiss());
+        tip.addView(tipClose);
+        root.addView(tip);
+
+        // ---- 两列网格 ----
+        String[][] items = {
+                {"复制", "→"},
+                {"移动", "→"},
+                {"删除", ""},
+                {"重命名", ""},
+                {"工具", ""},
+                {"压缩", ""},
+                {"属性", ""},
+                {"分享", ""},
+                {"打开方式", ""},
+                {"添加书签", ""},
+        };
+
+        for (int i = 0; i < items.length; i += 2) {
+            LinearLayout rowL = new LinearLayout(requireContext());
+            rowL.setOrientation(LinearLayout.HORIZONTAL);
+            for (int c = 0; c < 2; c++) {
+                if (i + c >= items.length) {
+                    // 占位，保持两列等宽
+                    View filler = new View(requireContext());
+                    rowL.addView(filler, new LinearLayout.LayoutParams(0, dp(48), 1f));
+                    continue;
+                }
+                final String label = items[i + c][0];
+                String arrow = items[i + c][1];
+                TextView cell = new TextView(requireContext());
+                cell.setText(arrow.length() > 0 ? (label + "  " + arrow) : label);
+                cell.setTextSize(14);
+                cell.setTextColor(0xFFE8EAF0);
+                cell.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                cell.setPadding(dp(16), 0, dp(8), 0);
+                cell.setBackgroundResource(R.drawable.bg_mt_panel_item);
+                cell.setMinHeight(dp(48));
+                cell.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    handleMtAction(label, e, pane);
+                });
+                rowL.addView(cell, new LinearLayout.LayoutParams(0, dp(48), 1f));
+            }
+            root.addView(rowL);
+        }
+
+        dialog.setContentView(root);
+
+        android.view.Window win = dialog.getWindow();
+        if (win != null) {
+            win.setBackgroundDrawableResource(android.R.color.transparent);
+            android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+            int w = (int) (dm.widthPixels * 0.88f);
+            win.setLayout(w, ViewGroup.LayoutParams.WRAP_CONTENT);
+            win.setGravity(android.view.Gravity.CENTER);
+            // 让面板尽可能居中（MT 的弹窗位置略高于正中）
+            android.view.WindowManager.LayoutParams lp = win.getAttributes();
+            lp.y = 0;
+            win.setAttributes(lp);
+        }
+        dialog.show();
+    }
+
+    /**
+     * 是否为压缩包（不应当作脚本执行）。
+     */
+    private boolean isArchiveFile(String name) {
+        if (name == null) {
+            return false;
+        }
+        String n = name.toLowerCase(java.util.Locale.ROOT);
+        return n.endsWith(".zip") || n.endsWith(".tar") || n.endsWith(".gz")
+                || n.endsWith(".tgz") || n.endsWith(".7z") || n.endsWith(".rar")
+                || n.endsWith(".xz") || n.endsWith(".bz2") || n.endsWith(".tar.gz");
+    }
+
+    /**
+     * 是否为可执行脚本。
+     * 只有 .sh / .bash 或无扩展名（ELF 通常也无扩展名）才算脚本。
+     */
+    private boolean isScriptFile(String name) {
+        if (name == null || name.length() == 0) {
+            return false;
+        }
+        String n = name.toLowerCase(java.util.Locale.ROOT);
+        if (n.endsWith(".sh") || n.endsWith(".bash")) {
+            return true;
+        }
+        // 无扩展名 → 可能是 ELF 可执行文件
+        int dot = n.lastIndexOf('.');
+        return dot < 0;
+    }
+
+    /** 压缩包的点击动作：解压到本窗 / 右窗 */
+    private void showArchiveActions(final FsEntry e, final Pane pane) {
+        final android.app.Dialog dialog = new android.app.Dialog(requireContext());
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setCanceledOnTouchOutside(true);
+
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bg_mt_panel);
+
+        TextView title = new TextView(requireContext());
+        title.setText(e.getName());
+        title.setTextSize(11);
+        title.setTextColor(0xFF8A8F9E);
+        title.setPadding(dp(16), dp(12), dp(16), dp(6));
+        root.addView(title);
+
+        String[][] opts = {{"解压", "0"}, {"查看内容", "1"}};
+        for (String[] o : opts) {
+            TextView cell = new TextView(requireContext());
+            cell.setText(o[0]);
+            cell.setTextSize(14);
+            cell.setTextColor(0xFFE8EAF0);
+            cell.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            cell.setPadding(dp(16), 0, dp(16), 0);
+            cell.setBackgroundResource(R.drawable.bg_mt_panel_item);
+            cell.setMinHeight(dp(48));
+            final boolean preview = "1".equals(o[1]);
+            cell.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (preview) {
+                    // 查看内容：用内置编辑器打开（zip 会显示为二进制，明确告知）
+                    toast("压缩包内容需解压后查看");
+                } else {
+                    unzipTo(e, pane);
+                }
+            });
+            root.addView(cell, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+        }
+
+        dialog.setContentView(root);
+        android.view.Window win = dialog.getWindow();
+        if (win != null) {
+            win.setBackgroundDrawableResource(android.R.color.transparent);
+            int w = (int) (getResources().getDisplayMetrics().widthPixels * 0.8f);
+            win.setLayout(w, ViewGroup.LayoutParams.WRAP_CONTENT);
+            win.setGravity(android.view.Gravity.CENTER);
+        }
+        dialog.show();
+    }
+
+    /**
+     * 批量操作面板（多选态长按已选中项时弹出）。
+     * 标题显示「已选 N 项」，动作作用于全部选中项。
+     */
+    private void showMtBatchPanel(final Pane pane) {
+        if (selected.isEmpty()) {
+            return;
+        }
+        final android.app.Dialog dialog = new android.app.Dialog(requireContext());
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setCanceledOnTouchOutside(true);
+
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bg_mt_panel);
+        root.setClipToOutline(true);
+
+        // 标题行：已选 N 项 + ×
+        LinearLayout head = new LinearLayout(requireContext());
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        head.setPadding(dp(16), dp(12), dp(6), dp(6));
+
+        TextView title = new TextView(requireContext());
+        title.setText("已选 " + selected.size() + " 项");
+        title.setTextSize(15);
+        title.setTextColor(0xFFE8EAF0);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        head.addView(title);
+
+        TextView close = new TextView(requireContext());
+        close.setText("×");
+        close.setTextSize(18);
+        close.setTextColor(0xFFB8BCC8);
+        close.setGravity(android.view.Gravity.CENTER);
+        close.setPadding(dp(10), dp(2), dp(10), dp(2));
+        close.setOnClickListener(v -> dialog.dismiss());
+        head.addView(close);
+        root.addView(head);
+
+        String[][] items = {
+                {"全选", "0"}, {"取消全选", "1"},
+                {"复制", "2"}, {"移动", "3"},
+                {"删除", "4"}, {"压缩", "5"},
+                {"分享", "6"}, {"属性", "7"},
+        };
+
+        for (int i = 0; i < items.length; i += 2) {
+            LinearLayout rowL = new LinearLayout(requireContext());
+            rowL.setOrientation(LinearLayout.HORIZONTAL);
+            for (int c = 0; c < 2; c++) {
+                final String label = items[i + c][0];
+                final String code = items[i + c][1];
+                TextView cell = new TextView(requireContext());
+                cell.setText(label);
+                cell.setTextSize(14);
+                cell.setTextColor("4".equals(code) ? 0xFFE86A5A : 0xFFE8EAF0);
+                cell.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                cell.setPadding(dp(16), 0, dp(16), 0);
+                cell.setBackgroundResource(R.drawable.bg_mt_panel_item);
+                cell.setMinHeight(dp(48));
+                cell.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    handleMtBatchAction(code, pane);
+                });
+                rowL.addView(cell, new LinearLayout.LayoutParams(0, dp(48), 1f));
+            }
+            root.addView(rowL);
+        }
+
+        dialog.setContentView(root);
+        android.view.Window win = dialog.getWindow();
+        if (win != null) {
+            win.setBackgroundDrawableResource(android.R.color.transparent);
+            int w = (int) (getResources().getDisplayMetrics().widthPixels * 0.88f);
+            win.setLayout(w, ViewGroup.LayoutParams.WRAP_CONTENT);
+            win.setGravity(android.view.Gravity.CENTER);
+        }
+        dialog.show();
+    }
+
+    /** 批量动作分发 */
+    private void handleMtBatchAction(String code, Pane pane) {
+        switch (code) {
+            case "0":                       // 全选
+                selectAllInPane(pane);
+                break;
+            case "1":                       // 取消全选
+                selected.clear();
+                pane.refreshSel();
+                updateMultiBar();
+                exitMulti();
+                break;
+            case "2":                       // 复制
+                multiCopyMove(false);
+                break;
+            case "3":                       // 移动
+                multiCopyMove(true);
+                break;
+            case "4":                       // 删除
+                multiDelete();
+                break;
+            case "5":                       // 压缩
+                multiZip();
+                break;
+            case "6":                       // 分享
+                sharePaths(CollectionsKt.toList(selected));
+                break;
+            case "7":                       // 属性
+                toast("已选 " + selected.size() + " 项");
+                break;
+            default:
+                break;
+        }
+    }
+
+    /** 全选当前窗格的所有条目 */
+    private void selectAllInPane(Pane pane) {
+        if (!multiMode) {
+            enterMulti(pane);
+        }
+        selected.clear();
+        for (FsEntry en : pane.getEntries()) {
+            if (en != null) {
+                selected.add(en.getPath());
+            }
+        }
+        pane.refreshSel();
+        showMultiBar();
+    }
+
+    /** 退出多选 */
+    private void exitMulti() {
+        multiMode = false;
+        selPane = null;
+        selected.clear();
+        if (getView() != null) {
+            View bar = getView().findViewById(R.id.multiBar);
+            if (bar != null) {
+                bar.setVisibility(View.GONE);
+            }
+        }
+        for (Pane p : panes) {
+            p.refreshSel();
+        }
+    }
+
+    /** 左上角 ☰ 菜单：MT 的汉堡菜单（回队列页 + 多选 + 常用动作） */
+    private void showMtMainMenu() {
+        android.widget.PopupMenu pm = new android.widget.PopupMenu(requireContext(), getView().findViewById(R.id.btnFilesBack));
+        pm.getMenu().add(0, 1, 0, "回队列页");
+        pm.getMenu().add(0, 2, 1, "多选");
+        pm.getMenu().add(0, 3, 2, "新建文件");
+        pm.getMenu().add(0, 4, 3, "新建文件夹");
+        pm.getMenu().add(0, 5, 4, "刷新");
+        pm.setOnMenuItemClickListener(item -> {
+            switch (item.getItemId()) {
+                case 1:
+                    android.app.Activity act = getActivity();
+                    if (act instanceof MainActivity) {
+                        ((MainActivity) act).switchTo(R.id.navQueue);
+                    }
+                    return true;
+                case 2:
+                    Pane p = activePane();
+                    if (p != null) {
+                        enterMulti(p);
+                        showMultiBar();
+                    }
+                    return true;
+                case 3:
+                    createFileDialog();
+                    return true;
+                case 4:
+                    createDirDialog();
+                    return true;
+                case 5:
+                    Pane ap = activePane();
+                    if (ap != null) {
+                        Pane.load$default(ap, ap.getDir(), 0, 2, null);
+                    }
+                    return true;
+                default:
+                    return false;
+            }
+        });
+        pm.show();
+    }
+
+    /** 右上角 ⋮ 溢出菜单 */
+    private void showMtOverflowMenu() {
+        android.widget.PopupMenu pm = new android.widget.PopupMenu(requireContext(), getView().findViewById(R.id.btnOverflow));
+        pm.getMenu().add(0, 1, 0, "全选");
+        pm.getMenu().add(0, 2, 1, "取消全选");
+        pm.getMenu().add(0, 3, 2, "显示/隐藏快捷路径");
+        pm.getMenu().add(0, 4, 3, "设置");
+        pm.setOnMenuItemClickListener(item -> {
+            switch (item.getItemId()) {
+                case 1:
+                    Pane p = activePane();
+                    if (p != null) {
+                        selectAllInPane(p);
+                    }
+                    return true;
+                case 2:
+                    selected.clear();
+                    Pane sp = selPane;
+                    if (sp != null) {
+                        sp.refreshSel();
+                    }
+                    exitMulti();
+                    return true;
+                case 3:
+                    View qr = getView() == null ? null : getView().findViewById(R.id.quickRow);
+                    if (qr != null) {
+                        View parent = (View) qr.getParent();
+                        if (parent != null) {
+                            parent.setVisibility(parent.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+                        }
+                    }
+                    return true;
+                case 4:
+                    toast("设置");
+                    return true;
+                default:
+                    return false;
+            }
+        });
+        pm.show();
+    }
+
+    /** 底部 5 图标工具栏：‹ › ＋ ⬅ ↑ */
+    private void bindBottomBar(View v) {
+        View b;
+        b = v.findViewById(R.id.btnNavBack);
+        if (b != null) {
+            b.setOnClickListener(x -> {
+                Pane p = activePane();
+                if (p != null && p.canGoBack()) {
+                    p.goBack();
+                }
+            });
+        }
+        b = v.findViewById(R.id.btnNavForward);
+        if (b != null) {
+            b.setOnClickListener(x -> {
+                Pane p = activePane();
+                if (p != null && p.canGoForward()) {
+                    p.goForward();
+                }
+            });
+        }
+        // btnNew 已有旧绑定，这里不重复
+        b = v.findViewById(R.id.btnNavUp);
+        if (b != null) {
+            b.setOnClickListener(x -> {
+                Pane p = activePane();
+                if (p != null) {
+                    Pane.load$default(p, parentOf(p.getDir()), 0, 2, null);
+                }
+            });
+        }
+        b = v.findViewById(R.id.btnNavUpload);
+        if (b != null) {
+            b.setOnClickListener(x -> toast("上传/导入"));
+        }
+    }
+
+    /** 当前活动窗 */
+    private Pane activePane() {
+        return (selPane != null) ? selPane : panes.get(0);
+    }
+
+    private String parentOf(String dir) {
+        if (dir == null || dir.length() == 0 || "/".equals(dir)) {
+            return "/";
+        }
+        String d = dir.endsWith("/") ? dir.substring(0, dir.length() - 1) : dir;
+        int i = d.lastIndexOf('/');
+        return i <= 0 ? "/" : d.substring(0, i);
+    }
+
+    /**
+     * 刷新顶部路径栏与状态行（MT 的「文件夹: N  文件: N  储存: A/B」）
+     */
+    private void updateFileStatus() {
+        if (getView() == null) {
+            return;
+        }
+        Pane p = activePane();
+        if (p == null) {
+            return;
+        }
+        TextView top = (TextView) getView().findViewById(R.id.pathTop);
+        if (top != null) {
+            top.setText(p.getDir());
+        }
+        TextView status = (TextView) getView().findViewById(R.id.fileStatus);
+        if (status != null) {
+            int dirs = 0;
+            int files = 0;
+            for (FsEntry e : p.getEntries()) {
+                if (e == null) {
+                    continue;
+                }
+                if (e.getIsDir()) {
+                    dirs++;
+                } else {
+                    files++;
+                }
+            }
+            status.setText("文件夹: " + dirs + "   文件: " + files + storageInfo());
+        }
+    }
+
+    /** 储存用量（优先从当前窗的 df 输出缓存取，取不到就省略） */
+    private String storageInfo() {
+        try {
+            String out = Engine.INSTANCE.exec("df -h /data | tail -1");
+            if (out != null && out.length() > 0) {
+                String[] cols = out.trim().split("\\s+");
+                if (cols.length >= 4) {
+                    return "   储存: " + cols[2] + "/" + cols[1];
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return "";
+    }
+
+    /** 分发 MT 面板动作到已有能力 */
+    private void handleMtAction(String label, FsEntry e, Pane pane) {
+        switch (label) {
+            case "复制":
+                copyMoveTo(e, pane, false, otherOf(pane));
+                break;
+            case "移动":
+                copyMoveTo(e, pane, true, otherOf(pane));
+                break;
+            case "删除":
+                deleteDialog(pane, e);
+                break;
+            case "重命名":
+                renameDialog(pane, e);
+                break;
+            case "压缩":
+                zipTo(e, pane);
+                break;
+            case "属性":
+                detailDialog(e);
+                break;
+            case "分享":
+                sharePaths(CollectionsKt.listOf(e.getPath()));
+                break;
+            case "工具":
+                fileMenu(e);
+                break;
+            case "打开方式":
+                openEditor(e);
+                break;
+            case "添加书签":
+                toast(getString(R.string.bookmark_added));
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * 文件名着色 —— 按 MT 管理器实测规律（用户录屏逐帧核对）：
+     *   文件夹        -> 白（label）
+     *   .sh / .bash   -> 绿（脚本可执行）     #4CD964
+     *   压缩包(.zip/.tar/.gz/.7z/.rar) -> 金（#E8A33D）
+     *   文档(.txt/.md/.docx/.log/.json/.xml/.conf/.ini/.cfg/.pdf) -> 蓝（#4A9EFF）
+     *   .apk          -> 白
+     *   其他          -> 白
+     */
+    private int typeColor(String name, boolean isDir) {
+        if (isDir) {
+            return colorOf(R.color.label);
+        }
+        String n = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
+
+        // 脚本：绿色
+        if (n.endsWith(".sh") || n.endsWith(".bash")) {
+            return colorOf(R.color.file_text_green);
+        }
+
+        // 压缩包：金色（MT 里 .zip 是金/橙色，与 .sh 的绿区分）
+        if (n.endsWith(".zip") || n.endsWith(".tar") || n.endsWith(".gz")
+                || n.endsWith(".tgz") || n.endsWith(".7z") || n.endsWith(".rar")
+                || n.endsWith(".xz") || n.endsWith(".bz2") || n.endsWith(".tar.gz")) {
+            return colorOf(R.color.file_text_gold);
+        }
+
+        // 文档：蓝色
+        if (n.endsWith(".txt") || n.endsWith(".md") || n.endsWith(".log")
+                || n.endsWith(".json") || n.endsWith(".xml") || n.endsWith(".conf")
+                || n.endsWith(".ini") || n.endsWith(".cfg")
+                || n.endsWith(".docx") || n.endsWith(".doc")
+                || n.endsWith(".pdf") || n.endsWith(".xlsx") || n.endsWith(".pptx")) {
+            return colorOf(R.color.file_text_blue);
+        }
+
+        return colorOf(R.color.label);
+    }
+
+    private int colorOf(int resId) {
+        return androidx.core.content.ContextCompat.getColor(requireContext(), resId);
     }
 
     private final String failMsg() {
@@ -699,6 +1329,12 @@ public final class FilesFragment extends Fragment {
         public static final void _init_$lambda$3(Pane this$0, FilesFragment this$1, AdapterView adapterView, View view, int pos, long j) {
             Intrinsics.checkNotNullParameter(this$0, "this$0");
             Intrinsics.checkNotNullParameter(this$1, "this$1");
+            // ★ 长按刚触发过：ListView 在 UP 时仍会派发本次点击，
+            //   必须在这里拦掉，否则会「长按弹面板 + 同时弹短按执行确认」。
+            if (this$1.mtSuppressClickUntil != null
+                    && System.currentTimeMillis() < this$1.mtSuppressClickUntil[0]) {
+                return;
+            }
             this$0.setActive();
             if (this$1.expandedTag != null) {
                 this$1.collapseSwipe();
@@ -727,13 +1363,27 @@ public final class FilesFragment extends Fragment {
                     if (this$1.isMediaFile(e.getName())) {
                         this$1.openMedia(e);
                         return;
-                    } else if (this$1.isApkFile(e.getName())) {
+                    }
+                    if (this$1.isApkFile(e.getName())) {
                         this$1.installApk(e);
                         return;
-                    } else {
+                    }
+                    // ★ 修复（用户录屏实测）：原先 else 兜底把所有「非文本/非媒体/非APK」
+                    //   都当脚本执行，导致点 .zip 也弹「执行确认 LinYuDriverLoaderVer.79.zip？」，
+                    //   真跑起来还可能损坏文件。这里按扩展名精确分流：
+                    if (this$1.isArchiveFile(e.getName())) {
+                        // 压缩包：不执行，弹「解压到本窗 / 解压到右窗」选择
+                        this$1.showArchiveActions(e, this$0);
+                        return;
+                    }
+                    if (this$1.isScriptFile(e.getName())) {
+                        // 只有 .sh / 无扩展名的可执行文件才走执行
                         this$1.executeFile(e);
                         return;
                     }
+                    // 其他未知类型：弹「打开方式」而非直接执行
+                    this$1.showMtActionPanel(e, this$0);
+                    return;
                 }
                 String linkTarget = e.getLinkTarget();
                 Intrinsics.checkNotNull(linkTarget);
@@ -753,10 +1403,17 @@ public final class FilesFragment extends Fragment {
                 return true;
             }
             FsEntry e = (FsEntry) CollectionsKt.getOrNull(this$0.entries, pos);
+            android.util.Log.d("HazeRoot", "onItemLongClick pos=" + pos + " entry=" + (e != null ? e.getName() : "null"));
             if (e == null) {
                 this$1.bgMenu();
             } else {
-                this$1.fileMenu(e);
+                // ★ 以 MT 录屏为准：长按 = 弹出「浮动操作面板」（两列网格），
+                //   不是全屏菜单、也不是进入多选。
+                try {
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                } catch (Exception ignored) {
+                }
+                this$1.showMtActionPanel(e, this$0);
             }
             return true;
         }
@@ -1001,6 +1658,8 @@ public final class FilesFragment extends Fragment {
                 this$1.elfMap.clear();
                 this$1.bindList();
                 this$1.probeElves(newDir);
+                // 刷新顶部路径栏与「文件夹/文件/储存」状态行（MT 风格）
+                this$0.updateFileStatus();
             }
         }
 
@@ -1136,7 +1795,53 @@ public final class FilesFragment extends Fragment {
                             badge.setImageResource(R.drawable.ic_file);
                         }
                         nameV.setText(e.getName());
-                        meta.setText(e.getPerm() + "  \u00b7  " + this.this$0.fmtSize(e.getSize()));
+                        // ★ 按 MT 录屏：文件名折行显示（最多两行），不做省略号截断，
+                        //   保证后缀（.sh/.apk/.zip）始终可见。
+                        nameV.setMaxLines(2);
+                        nameV.setEllipsize(null);
+                        // 兜底：若两行仍显示不全，主动把中间截断、保留「首段…后缀」
+                        nameV.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                android.text.Layout lay = nameV.getLayout();
+                                if (lay == null) {
+                                    return;
+                                }
+                                int lines = lay.getLineCount();
+                                if (lines > 2 && nameV.getLineCount() > 2
+                                        || (lay.getEllipsisCount(Math.max(0, lay.getLineCount() - 1)) > 0)) {
+                                    // 超出：保留后缀
+                                    String full = e.getName();
+                                    int dot = full.lastIndexOf('.');
+                                    if (dot > 0 && dot < full.length() - 1) {
+                                        String ext = full.substring(dot);
+                                        String head = full.substring(0, dot);
+                                        int keep = Math.min(head.length(), 18);
+                                        nameV.setText(head.substring(0, keep) + "…" + ext);
+                                    }
+                                }
+                            }
+                        });
+                        // ★ 按 MT 录屏复刻：文件名按类型着色
+                        nameV.setTextColor(typeColor(e.getName(), e.getIsDir()));
+                        // ★ 方案 A′：副行拆成**双列**（权限左 / 大小右定宽 44dp）
+                        //   原单串「-rwxr-xr-x · 3.4 KB」填充率 90.7%（MT 约 65%），
+                        //   是「拥挤」的首要原因。拆列后降到 74.7%。
+                        //   权限去掉前导 '-'，节省 1 字符并更可读。
+                        String perm = e.getPerm();
+                        if (perm != null && perm.length() > 1 && perm.charAt(0) == '-') {
+                            perm = perm.substring(1);
+                        }
+                        meta.setText(perm);
+                        TextView sizeV = (TextView) v.findViewById(R.id.fSize);
+                        if (sizeV != null) {
+                            sizeV.setText(this.this$0.fmtSize(e.getSize()));
+                        }
+                        // 文件夹行右侧显示进入箭头
+                        TextView arrow = (TextView) v.findViewById(R.id.fArrow);
+                        if (arrow != null) {
+                            arrow.setVisibility(e.getIsDir() ? View.VISIBLE : View.GONE);
+                        }
                         // 修复（R3/R6）：长文件名被 middle 省略时，长按文件名弹「完整名 + 完整路径」兜底。
                         // 只对 fName 生效，不干扰整行的长按多选手势（行手势由 bindSwipe 处理）。
                         final FsEntry fe = e;
@@ -1337,12 +2042,50 @@ public final class FilesFragment extends Fragment {
         Code decompiled incorrectly, please refer to instructions dump.
         To view partially-correct add '--show-bad-code' argument
     */
-    public static final void multiCopyMove$lambda$28(java.util.List r18, final com.hazeroot.scriptrunner.FilesFragment r19, final com.hazeroot.scriptrunner.FilesFragment.Pane r20, final boolean r21, final int r22, final com.hazeroot.scriptrunner.FilesFragment.Pane r23) {
-        /*
-            Method dump skipped, instructions count: 297
-            To view this dump add '--comments-level debug' option
-        */
-        throw new UnsupportedOperationException("Method not decompiled: com.hazeroot.scriptrunner.FilesFragment.multiCopyMove$lambda$28(java.util.List, com.hazeroot.scriptrunner.FilesFragment, com.hazeroot.scriptrunner.FilesFragment$Pane, boolean, int, com.hazeroot.scriptrunner.FilesFragment$Pane):void");
+    public static final void multiCopyMove$lambda$28(final java.util.List paths, final FilesFragment this$0, final Pane from, final boolean move, final int total, final Pane to) {
+        // ★ 原方法被 JADX 放弃（UnsupportedOperationException），一直是空壳，
+        //   点「移动」必崩。这里按语义重写：逐个 cp -a / mv 到目标窗当前目录。
+        final Ref.IntRef done = new Ref.IntRef();
+        final Ref.IntRef skipped = new Ref.IntRef();
+        try {
+            String dstDir = to.getDir();
+            for (Object o : paths) {
+                String src = (String) o;
+                String name = Kt.substringAfterLast(src, '/', (String) null, 2, (Object) null);
+                String dst = dstDir + "/" + name;
+                String q = Engine.INSTANCE.q(src);
+                String qd = Engine.INSTANCE.q(dst);
+                // 源=目标 或 已存在则跳过
+                if (Intrinsics.areEqual(src, dst)) {
+                    skipped.element++;
+                    continue;
+                }
+                String cmd;
+                if (move) {
+                    cmd = "test -e " + qd + " && echo EXIST || (mv " + q + " " + qd + " && echo OK)";
+                } else {
+                    cmd = "test -e " + qd + " && echo EXIST || (cp -a " + q + " " + qd + " && echo OK)";
+                }
+                String out = Engine.INSTANCE.exec(cmd);
+                if (out == null) {
+                    skipped.element++;
+                } else if (Kt.contains(out, "OK", false, 2, (Object) null)) {
+                    done.element++;
+                } else {
+                    skipped.element++;
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.e("HazeRoot", "批量复制/移动失败", e);
+        }
+        if (this$0.isAdded()) {
+            this$0.requireActivity().runOnUiThread(new Runnable() {
+                @Override // java.lang.Runnable
+                public final void run() {
+                    FilesFragment.multiCopyMove$lambda$28$lambda$27(this$0, done, total, skipped, move, from, to);
+                }
+            });
+        }
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -1616,6 +2359,7 @@ public final class FilesFragment extends Fragment {
     /* JADX INFO: Access modifiers changed from: private */
     public final void bindSwipe(View view, final FsEntry item) {
         final View fg = view.findViewById(R.id.fgContent);
+        android.util.Log.d("HazeRoot", "bindSwipe: " + (item != null ? item.getName() : "null") + " fg=" + (fg != null));
         final float maxSwipe = dp(48) * 4;
         final int slop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
         int i = 1;
@@ -1654,18 +2398,82 @@ public final class FilesFragment extends Fragment {
             }
         };
         fg.setClickable(true);
+        // ★ 长按 = 浮动操作面板（MT 录屏）。这里用自带定时器实现：
+        //   fg 是 clickable 的，会吃掉 DOWN 事件，导致 ListView.onItemLongClick 永远收不到，
+        //   所以必须在 fg 自己的 touch 流里判定长按。
+        final boolean[] longConsumed = new boolean[]{false};
+        // 长按触发后，短时间内屏蔽 onItemClick（ListView 自己会在 UP 时派发点击，
+        // fg 返回 true 并不能阻止它）。用时间戳而不是布尔，避免残留状态吞掉下一次真实点击。
+        final long[] suppressClickUntil = new long[]{0L};
+        final Runnable mtLongPress = new Runnable() {
+            @Override
+            public void run() {
+                longConsumed[0] = true;
+                // 屏蔽 800ms 内的 onItemClick —— 覆盖「长按抬起」这一刻
+                suppressClickUntil[0] = System.currentTimeMillis() + 800L;
+                Pane p = paneOfRow(FilesFragment.this, fg);
+                p.setActive();
+                try {
+                    fg.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                } catch (Exception ignored) {
+                }
+                // ★ 按 MT 录屏：多选态下长按「已选中」的行 → 弹批量操作面板
+                if (multiMode && selPane == p && selected.contains(item.getPath()) && selected.size() > 1) {
+                    showMtBatchPanel(p);
+                } else {
+                    showMtActionPanel(item, p);
+                }
+            }
+        };
+        // 把屏蔽时间戳挂到 Fragment 上，供 onItemClick 读取
+        this.mtSuppressClickUntil = suppressClickUntil;
         fg.setOnTouchListener(new View.OnTouchListener() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda43
             @Override // android.view.View.OnTouchListener
             public final boolean onTouch(View view2, MotionEvent motionEvent) {
-                boolean bindSwipe$lambda$39;
-                bindSwipe$lambda$39 = FilesFragment.bindSwipe$lambda$39(downX, downY, startTx, mode, longFired, dragAnchor, listTop, FilesFragment.this, item, longPress, maxSwipe, slop, pane2, list, view2, motionEvent);
-                return bindSwipe$lambda$39;
+                int act = motionEvent.getActionMasked();
+                if (act == MotionEvent.ACTION_DOWN) {
+                    longConsumed[0] = false;     // 新手势开始，重置标记
+                    downX.element = motionEvent.getX();
+                    downY.element = motionEvent.getY();
+                    view2.removeCallbacks(mtLongPress);
+                    view2.postDelayed(mtLongPress, 600L);
+                    return true;
+                }
+                if (longConsumed[0]) {
+                    // ★ 长按已触发：抬起/移动都不再走短按逻辑，
+                    //   否则会「长按弹面板的同时又触发一次短按执行询问」。
+                    view2.removeCallbacks(mtLongPress);
+                    if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) {
+                        longConsumed[0] = false;
+                    }
+                    return true;
+                }
+                if (act == MotionEvent.ACTION_MOVE) {
+                    float mx = Math.abs(motionEvent.getX() - downX.element);
+                    float my = Math.abs(motionEvent.getY() - downY.element);
+                    if (mx > slop || my > slop) {
+                        view2.removeCallbacks(mtLongPress);
+                    }
+                } else {
+                    view2.removeCallbacks(mtLongPress);
+                }
+                boolean handled = FilesFragment.bindSwipe$lambda$39(downX, downY, startTx, mode, longFired, dragAnchor, listTop, FilesFragment.this, item, mtLongPress, maxSwipe, slop, pane2, list, view2, motionEvent);
+                return handled;
             }
         });
         ((TextView) view.findViewById(R.id.fbEnqueue)).setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda44
             @Override // android.view.View.OnClickListener
             public final void onClick(View view2) {
-                FilesFragment.bindSwipe$lambda$41(FilesFragment.this, item, view2);
+                // ★ 左滑第一个按钮 = 多选（MT 风格）：进入多选并选中当前行
+                Pane p = paneOfRow(FilesFragment.this, view);
+                p.setActive();
+                if (!multiMode || selPane != p) {
+                    enterMulti(p);
+                }
+                toggleSelect(item.getPath(), p);
+                showMultiBar();
+                p.refreshSel();
+                collapseSwipe();
             }
         });
         ((TextView) view.findViewById(R.id.fbCopy)).setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda45
@@ -1736,7 +2544,9 @@ public final class FilesFragment extends Fragment {
                 if (this$0.expandedTag != null && !Intrinsics.areEqual(this$0.expandedTag, $item.getPath())) {
                     this$0.collapseSwipe();
                 }
-                v.postDelayed(longPress, 500L);
+                // 长按改由系统 OnLongClickListener 处理（见 bindSwipe 里的 setOnLongClickListener），
+                // 这里不再自建 500ms 定时器 —— 自研定时器会被 ACTION_MOVE 取消，
+                // 导致长按在真机上经常不触发。
                 break;
             case 1:
             case 3:
@@ -1756,10 +2566,21 @@ public final class FilesFragment extends Fragment {
                     ((Pane) element$iv).flushSelRefresh();
                 }
                 if (mode.element == 1) {
+                    // ★ 按 MT 录屏（用户实测纠正）：左滑超过阈值 = **直接进入多选**
+                    //   （不是先露出按钮、再点按钮）。
+                    //   进入后底部出现「全选 / 取消全选 / 批量操作」，并选中当前行。
                     if (v.getTranslationX() < (-$maxSwipe) / 2.0f) {
-                        this$0.expandedTag = $item.getPath();
-                        this$0.expandedFg = v;
-                        v.animate().translationX(-$maxSwipe).setDuration(140L).start();
+                        v.animate().translationX(0.0f).setDuration(120L).start();
+                        this$0.expandedTag = null;
+                        this$0.expandedFg = null;
+                        Pane rowPane = paneOfRow(this$0, v);
+                        rowPane.setActive();
+                        if (!this$0.multiMode || this$0.selPane != rowPane) {
+                            this$0.enterMulti(rowPane);
+                        }
+                        this$0.toggleSelect($item.getPath(), rowPane);
+                        this$0.showMultiBar();
+                        rowPane.refreshSel();
                     } else {
                         this$0.expandedTag = null;
                         this$0.expandedFg = null;
@@ -1774,21 +2595,17 @@ public final class FilesFragment extends Fragment {
                     }
                     break;
                 } else if (longFired.element) {
-                    // 修复（R3 的 S 级痛点）：长按语义对齐 MT —— 「进入多选并选中该项」，
-                    // 而不是弹单条操作菜单。原实现长按松手走 fileMenu，与 MT 肌肉记忆直接冲突
-                    // （想批量删文件，却弹出单文件的复制/移动菜单）。
+                    // ★ 以 MT 录屏为准（用户提供的 136s 操作视频逐帧确认）：
+                    //   长按 = 弹出「浮动操作面板」（两列网格：复制|移动 / 删除|重命名 /
+                    //   工具|压缩 / 属性|分享 / 打开方式|添加书签），
+                    //   不是进入多选。多选另有入口（☰ 菜单）。
                     Pane rowPaneL = paneOfRow(this$0, v);
                     rowPaneL.setActive();
-                    if (!this$0.multiMode || this$0.selPane != rowPaneL) {
-                        this$0.enterMulti(rowPaneL);
-                    }
-                    this$0.toggleSelect($item.getPath(), rowPaneL);
-                    this$0.showMultiBar();
-                    rowPaneL.refreshSel();
                     try {
                         v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
                     } catch (Exception ignored) {
                     }
+                    this$0.showMtActionPanel($item, rowPaneL);
                     break;
                 } else if (ev.getActionMasked() == 1) {
                     // 事件发生时按"该行实际所在的 ListView"判定窗格，
@@ -3499,14 +4316,14 @@ public final class FilesFragment extends Fragment {
     /* JADX INFO: Access modifiers changed from: private */
     public final String fmtSize(long b) {
         if (b >= 1048576) {
-            String format = String.format("%.1f MB", Arrays.copyOf(new Object[]{Float.valueOf(b / 1048576.0f)}, 1));
+            String format = String.format("%.1fM", Arrays.copyOf(new Object[]{Float.valueOf(b / 1048576.0f)}, 1));
             Intrinsics.checkNotNullExpressionValue(format, "format(...)");
             return format;
         }
         if (b < 1024) {
-            return b + " B";
+            return b + "B";
         }
-        String format2 = String.format("%.1f KB", Arrays.copyOf(new Object[]{Float.valueOf(b / 1024.0f)}, 1));
+        String format2 = String.format("%.1fK", Arrays.copyOf(new Object[]{Float.valueOf(b / 1024.0f)}, 1));
         Intrinsics.checkNotNullExpressionValue(format2, "format(...)");
         return format2;
     }

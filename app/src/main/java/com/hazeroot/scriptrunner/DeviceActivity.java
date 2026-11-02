@@ -119,7 +119,13 @@ public final class DeviceActivity extends AppCompatActivity {
             tvThermalState.setText("读取失败");
             return;
         }
-        ThermalSnapshot.Zone hot = s.hottest();
+        // ★ 真机验证修正：不再用「全局最热温区」（含 hvdcp_opti 快充等瞬时高温传感器，
+        //   会出现 93℃ 这类对用户无意义的读数）。改为展示用户真正关心的三路温度：
+        //   CPU / GPU / 电池，各自取同类传感器里的最高值。
+        float cpuT = maxOfKeyword(s, "cpu", "cpuss", "cpu-");
+        float gpuT = maxOfKeyword(s, "gpu", "gpuss");
+        float battT = s.batteryTempC();
+
         String state;
         if (s.thermalStatus >= 3) {
             state = "热状态 " + s.thermalStatus + " · 严重";
@@ -128,28 +134,26 @@ public final class DeviceActivity extends AppCompatActivity {
         } else {
             state = "正常";
         }
-        String head = state;
-        if (hot != null) {
-            head += String.format(Locale.ROOT, "  ·  最高 %.1f℃", hot.tempC);
+        StringBuilder head = new StringBuilder(state);
+        if (cpuT > 0) {
+            head.append(String.format(Locale.ROOT, "  ·  CPU %.1f℃", cpuT));
         }
-        tvThermalState.setText(head);
+        tvThermalState.setText(head.toString());
 
         StringBuilder sb = new StringBuilder();
-        sb.append("电池    ").append(String.format(Locale.ROOT, "%.1f℃", s.batteryTempC()))
+        sb.append("电池    ").append(String.format(Locale.ROOT, "%.1f℃", battT))
           .append("  ").append(s.batteryCapacity).append("%\n");
         sb.append("热状态  ").append(s.thermalStatus >= 0 ? String.valueOf(s.thermalStatus) : "未取到").append('\n');
+        if (cpuT > 0) {
+            sb.append("CPU     ").append(String.format(Locale.ROOT, "%.1f℃", cpuT)).append('\n');
+        }
+        if (gpuT > 0) {
+            sb.append("GPU     ").append(String.format(Locale.ROOT, "%.1f℃", gpuT)).append('\n');
+        }
 
         int active = s.activeCoolings().size();
         sb.append("限频设备 ").append(active).append(" / ").append(s.coolings.size()).append(" 个介入\n");
 
-        float cpuT = s.tempByKeyword("cpu");
-        if (cpuT > 0) {
-            sb.append("CPU     ").append(String.format(Locale.ROOT, "%.1f℃", cpuT)).append('\n');
-        }
-        float gpuT = s.tempByKeyword("gpu");
-        if (gpuT > 0) {
-            sb.append("GPU     ").append(String.format(Locale.ROOT, "%.1f℃", gpuT)).append('\n');
-        }
         for (ThermalSnapshot.CpuPolicy p : s.cpuPolicies) {
             int pct = p.maxPercent();
             sb.append(p.id).append("  上限 ")
@@ -166,6 +170,30 @@ public final class DeviceActivity extends AppCompatActivity {
             sb.append("· ").append(c.type).append("  ").append(c.curState).append('/').append(c.maxState).append('\n');
         }
         tvThermalDetail.setText(sb.toString().trim());
+    }
+
+    /** 取多个关键词命中的所有温区里的最高有效温度；取不到返回 -1 */
+    private float maxOfKeyword(ThermalSnapshot s, String... keywords) {
+        float best = -1f;
+        for (String k : keywords) {
+            float t = s.tempByKeyword(k);
+            if (t > best) {
+                best = t;
+            }
+        }
+        // tempByKeyword 只返回第一个匹配，这里再做一次全量扫描取该类最高
+        float scan = -1f;
+        String first = keywords.length > 0 ? keywords[0].toLowerCase(Locale.ROOT) : "";
+        if (first.length() > 0) {
+            for (ThermalSnapshot.Zone z : s.zones) {
+                if (z.tempMilliC > 0 && z.type != null
+                        && z.type.toLowerCase(Locale.ROOT).contains(first)
+                        && z.tempC > scan) {
+                    scan = z.tempC;
+                }
+            }
+        }
+        return Math.max(best, scan);
     }
 
     // ===== 刷新率 =====

@@ -397,4 +397,8 @@
     <color name="tooltip_background_light">#e6ffffff</color>
     <color name="warning">#C0764A</color>
     <color name="warning_tint8">#14C0764A</color>
+    <color name="file_text_blue">#FF4A9EFF</color>
+    <color name="file_text_green">#FF4CD964</color>
+    <color name="file_text_orange">#FFE8A33D</color>
+    <color name="file_text_gold">#FFE8A33D</color>
 </resources>

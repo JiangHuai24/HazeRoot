@@ -122,16 +122,22 @@ public final class ThermalDumpParser {
      *   <= 200      → 视为 ℃，×1000
      *   <= 200000   → 视为毫℃，原样
      *   >  200000   → 异常值，按毫℃保留（后续展示层处理）
+     *
+     * ★ 真机 bug 修复：高通平台大量传感器在「未接/未启用」时返回 -273000（-273℃ 哨兵值）。
+     *   原实现把它当有效温度，导致「最热温区」被判定成 -273℃，UI 显示成 93.0℃ 之类的乱值。
+     *   这里统一过滤：低于 -40℃ 或高于 150℃ 一律视为无效（return 0，由上层跳过）。
      */
     static int normalizeTemp(int raw) {
         if (raw == 0) {
             return 0;
         }
         int abs = Math.abs(raw);
-        if (abs <= 200) {
-            return raw * 1000;
+        int milli = (abs <= 200) ? raw * 1000 : raw;
+        // 物理上手机不可能低于 -40℃ 或高于 150℃，超出即视为无效传感器
+        if (milli < -40_000 || milli > 150_000) {
+            return 0;
         }
-        return raw;
+        return milli;
     }
 
     private static int parseInt(String s, int def) {

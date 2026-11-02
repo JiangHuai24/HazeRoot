@@ -94,6 +94,10 @@ public final class Engine {
     private static volatile boolean pendingClearScreen = false;
     private static volatile boolean pendingClearLine = false;
     private static volatile String lastPromptText = "";
+    // 方案重放时的降级匹配：规范化 key 映射 + 顺序回退
+    private static volatile java.util.Map<String, List<String>> pendingNormalized = null;
+    private static volatile List<String> pendingOrdered = null;
+    private static volatile int orderedCursor = 0;
 
     /* compiled from: Engine.kt */
     
@@ -253,6 +257,24 @@ public final class Engine {
         synchronized (TERM_LOCK) {
             return termBuffer.toString();
         }
+    }
+
+    /**
+     * 终端欢迎语（终端页首次打开或清空后显示）。
+     * 内容：版本 + 当前队列状态 + 一句操作提示。
+     */
+    public final String welcomeText() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("HazeRoot v2.8.4\n");
+        int n = scripts.size();
+        if (n == 0) {
+            sb.append("队列为空 · 到「队列」页添加脚本\n");
+        } else {
+            sb.append("队列 ").append(n).append(" 个脚本 · 就绪\n");
+        }
+        sb.append("脚本输出会实时显示在这里\n");
+        sb.append("脚本提问时，在下方输入框回答即可\n");
+        return sb.toString();
     }
 
     /** 线程安全地判断终端缓冲是否为空 */
@@ -1072,6 +1094,17 @@ public final class Engine {
                 }
             }
             pending = m;
+            // ★ 方案库保留已录答案：脚本更新后提示文案可能变化，精确匹配会失效。
+            //   这里额外准备两条降级链：
+            //     ① 规范化 key（去空白/去标点/小写）后的映射
+            //     ② 按录制顺序的顺序回退列表（提示对不上时依次取用）
+            pendingNormalized = new LinkedHashMap<>();
+            pendingOrdered = new ArrayList<>();
+            for (Map.Entry<String, List<String>> en : m.entrySet()) {
+                pendingNormalized.put(normalizePrompt(en.getKey()), en.getValue());
+                pendingOrdered.addAll(en.getValue());
+            }
+            orderedCursor = 0;
         }
         synchronized (recordLock) {
             recordingCollect = auto ? null : new LinkedHashMap<String, List<String>>();
@@ -1208,7 +1241,26 @@ public final class Engine {
                 }
                 if (pending != null && !pending.isEmpty()) {
                     String key = promptKey();
+                    // ★ 三级降级匹配（让脚本更新后仍能沿用已录答案）：
+                    //   ① 精确 prompt 文本
+                    //   ② 规范化后匹配（去空白/标点/小写）
+                    //   ③ 顺序回退（提示文案完全变了，就按录制顺序依次取用）
                     List<String> vals = pending.get(key);
+                    if (vals == null || vals.isEmpty()) {
+                        java.util.Map<String, List<String>> norm = pendingNormalized;
+                        if (norm != null) {
+                            vals = norm.get(normalizePrompt(key));
+                        }
+                    }
+                    if (vals == null || vals.isEmpty()) {
+                        List<String> ordered = pendingOrdered;
+                        if (ordered != null && orderedCursor < ordered.size()) {
+                            String fallback = ordered.get(orderedCursor);
+                            orderedCursor++;
+                            vals = new ArrayList<>();
+                            vals.add(fallback);
+                        }
+                    }
                     if (vals != null && !vals.isEmpty()) {
                         String v = vals.remove(0);
                         try {
@@ -1299,21 +1351,9 @@ public final class Engine {
     /* JADX INFO: Access modifiers changed from: private */
     public static final void runOne$lambda$9(Ref.BooleanRef runDone) {
         Intrinsics.checkNotNullParameter(runDone, "$runDone");
-        long lastTip = 0;
+        // 「已 N 秒无输出」提示已按用户要求移除：脚本安静时不再向终端插入任何文案，
+        // 只保留看门狗的存活检测（下面这个循环仍用于在脚本结束后退出）。
         while (!runDone.element && !abortFlag) {
-            long idle = System.currentTimeMillis() - lastOutputAt;
-            if (idle > 12000 && System.currentTimeMillis() - lastTip > IDLE_MS) {
-                lastTip = System.currentTimeMillis();
-                Engine engine = INSTANCE;
-                Context context = appCtx;
-                if (context == null) {
-                    Intrinsics.throwUninitializedPropertyAccessException("appCtx");
-                    context = null;
-                }
-                String string = context.getString(R.string.silence_tip_fmt, Long.valueOf(idle / 1000));
-                Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
-                engine.log(string, S_DIM);
-            }
             try {
                 Thread.sleep(3000L);
             } catch (InterruptedException e) {
@@ -1571,6 +1611,25 @@ public final class Engine {
         String sb2 = sb.toString();
         Intrinsics.checkNotNullExpressionValue(sb2, "toString(...)");
         return new Pair<>(sb2, Integer.valueOf(bytes.length - i));
+    }
+
+    /**
+     * 提示文本规范化：用于「脚本更新后提示文案微调」时的宽松匹配。
+     * 去掉所有空白、标点、全角符号，统一小写，只保留字母/数字/汉字。
+     * 例："请输入卡密: " 与 "请输入卡密：" 会得到同样的 key。
+     */
+    static String normalizePrompt(String s) {
+        if (s == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isLetterOrDigit(c)) {
+                sb.append(Character.toLowerCase(c));
+            }
+        }
+        return sb.toString();
     }
 
     private final String resolveAnswer(ScriptItem s, String line, boolean auto) {

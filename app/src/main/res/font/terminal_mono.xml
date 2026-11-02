@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 终端等宽字体族：优先 JetBrains Mono，缺失时回退系统 monospace -->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:font="@font/jetbrains_mono"
+        android:fontStyle="normal"
+        android:fontWeight="400" />
+</font-family>

@@ -370,4 +370,18 @@
     <item type="id" name="blobQueue" />
     <item type="id" name="blobTerminal" />
     <item type="id" name="blobFiles" />
+    <item type="id" name="presetCount" />
+    <item type="id" name="navTerminal" />
+    <item type="id" name="navHome" />
+    <item type="id" name="fArrow" />
+    <item type="id" name="btnFilesBack" />
+    <item type="id" name="fSize" />
+    <item type="id" name="mBtnNone" />
+    <item type="id" name="pathTop" />
+    <item type="id" name="btnOverflow" />
+    <item type="id" name="fileStatus" />
+    <item type="id" name="btnNavBack" />
+    <item type="id" name="btnNavForward" />
+    <item type="id" name="btnNavUp" />
+    <item type="id" name="btnNavUpload" />
 </resources>

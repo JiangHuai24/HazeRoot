@@ -36,7 +36,27 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
     private TextView promptView;
     private LinearLayout promptRow;
 
-    private int renderedChars = 0;
+    // -1 = 当前显示的是欢迎语（不是真实输出）；>=0 = 已渲染的真实字符数
+    private int renderedChars = -1;
+    private ImageView stopBtn;
+
+    /** 终端字号（sp）：13 是等宽字在 1080p 手机上「清晰 + 不占宽」的平衡点 */
+    private static final int TERM_TEXT_SP = 13;
+    /** 终端行距额外间距（dp）：越小越紧凑，2dp 接近 MT 的密排观感 */
+    private static final int TERM_LINE_EXTRA_DP = 2;
+
+    /**
+     * 加载终端等宽字体。
+     * 优先用内置的 JetBrains Mono（终端专用、字形清晰、中英混排稳定）；
+     * 资源缺失或加载失败时回退系统 monospace，绝不因字体问题崩溃。
+     */
+    private android.graphics.Typeface loadTerminalTypeface() {
+        try {
+            return androidx.core.content.res.ResourcesCompat.getFont(requireContext(), R.font.jetbrains_mono);
+        } catch (Exception e) {
+            return android.graphics.Typeface.MONOSPACE;
+        }
+    }
 
     @Nullable
     @Override
@@ -63,15 +83,34 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
         head.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
+        // 「存为方案」：把本次执行的队列 + 已录制的问答存进方案库
+        // （用户反馈：终端页没有按钮可以把全流程存入方案库）
+        TextView savePreset = new TextView(requireContext());
+        savePreset.setText(getString(R.string.save_as_preset));
+        savePreset.setTextSize(12);
+        savePreset.setTextColor(color(R.color.accent));
+        savePreset.setPadding(dp(10), dp(4), dp(10), dp(4));
+        savePreset.setOnClickListener(v -> saveCurrentAsPreset());
+        head.addView(savePreset);
+
         TextView clear = new TextView(requireContext());
         clear.setText(getString(R.string.clear));
         clear.setTextSize(12);
         clear.setTextColor(color(R.color.label_secondary));
         clear.setPadding(dp(10), dp(4), dp(10), dp(4));
         clear.setOnClickListener(v -> {
+            // 清空 = 丢弃当前已显示的全部内容，从此刻起只显示新输出。
+            // 注意：如果脚本仍在跑，清空后它会继续写新内容（这是预期行为，不是"没效果"）。
             Engine.INSTANCE.clearTerm();
-            renderedChars = 0;
+            renderedChars = 0;                 // 从 0 开始，后续只追加新内容
+            if (termView != null) {
+                Editable d = termView.getEditableText();
+                if (d != null) {
+                    d.clear();
+                }
+            }
             syncTerm();
+            toast(getString(R.string.cleared));
         });
         head.addView(clear);
 
@@ -91,11 +130,21 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
         termScroll.setFillViewport(true);
 
         termView = new TextView(requireContext());
-        termView.setTextSize(12);
+        // ★ 必须显式设为 EDITABLE：getEditableText() 只有在 BufferType.EDITABLE 下才返回非 null，
+        //   否则恒为 null，syncTerm 会永远早退导致终端白屏。
+        termView.setText("", TextView.BufferType.EDITABLE);
+        termView.setTextSize(TERM_TEXT_SP);
         termView.setTextColor(color(R.color.term_text));
-        termView.setTypeface(android.graphics.Typeface.MONOSPACE);
-        termView.setLineSpacing(dp(4), 1f);
+        termView.setTypeface(loadTerminalTypeface());
+        // 行高：13sp 字号配 1.45 倍行距，接近 MT 的紧凑观感（原先 4dp 额外间距偏松）
+        termView.setLineSpacing(dp(TERM_LINE_EXTRA_DP), 1f);
         termView.setPadding(dp(12), dp(10), dp(12), dp(10));
+        termView.setIncludeFontPadding(false);
+        // 进入终端页时：没有正在执行 → 清掉上次残留输出，显示欢迎语
+        if (!Engine.INSTANCE.getRunningNow()) {
+            Engine.INSTANCE.clearTerm();
+            renderedChars = 0;
+        }
         termScroll.addView(termView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         panelWrap.addView(termScroll, new FrameLayout.LayoutParams(
@@ -154,6 +203,20 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
         slp.leftMargin = dp(6);
         inputRow.addView(send, slp);
 
+        // 终止按钮：执行中可随时停止（原队列页的停止键迁到这里）
+        stopBtn = new ImageView(requireContext());
+        stopBtn.setImageResource(R.drawable.ic_stop);
+        stopBtn.setBackgroundResource(R.drawable.bg_stop_circle);
+        stopBtn.setPadding(dp(10), dp(10), dp(10), dp(10));
+        stopBtn.setContentDescription(getString(R.string.cd_stop));
+        stopBtn.setOnClickListener(v -> {
+            Engine.INSTANCE.abort();
+            toast(getString(R.string.stopping));
+        });
+        LinearLayout.LayoutParams stlp = new LinearLayout.LayoutParams(dp(42), dp(42));
+        stlp.leftMargin = dp(6);
+        inputRow.addView(stopBtn, stlp);
+
         root.addView(inputRow);
 
         manualInput.setOnEditorActionListener((v, actionId, event) -> {
@@ -168,12 +231,22 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
     }
 
     private void sendManual() {
+        if (manualInput == null) {
+            return;
+        }
         String t = manualInput.getText().toString();
         if (t.length() == 0) {
             return;
         }
-        Engine.INSTANCE.sendRaw(t);
-        manualInput.setText("");
+        // 与 QueueFragment 对齐：没有脚本在跑时提示，且发送失败不清空输入框
+        if (!Engine.INSTANCE.getRunningNow()) {
+            android.widget.Toast.makeText(requireContext(),
+                    getString(R.string.no_running_script), android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (Engine.INSTANCE.sendRaw(t)) {
+            manualInput.setText("");
+        }
     }
 
     @Override
@@ -181,6 +254,7 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
         super.onResume();
         Engine.INSTANCE.addListener(this);
         syncTerm();
+        refreshStopState();
     }
 
     @Override
@@ -191,15 +265,86 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
 
     @Override
     public void onEvent(String type, String payload) {
-        if ("log".equals(type) || "state".equals(type)) {
+        if ("log".equals(type) || "state".equals(type) || "done".equals(type)) {
             syncTerm();
+            refreshStopState();
         } else if ("prompt".equals(type)) {
             if (promptRow != null && promptView != null) {
                 promptView.setText(payload);
                 promptRow.setVisibility(payload != null && payload.length() > 0 ? View.VISIBLE : View.GONE);
             }
             syncTerm();
+            refreshStopState();
         }
+    }
+
+    /** 执行中才点亮终止按钮 */
+    private void refreshStopState() {
+        if (stopBtn == null) {
+            return;
+        }
+        boolean running = Engine.INSTANCE.getRunningNow();
+        stopBtn.setEnabled(running);
+        stopBtn.setAlpha(running ? 1.0f : 0.35f);
+    }
+
+    /**
+     * 把当前队列 + 已录制的回答存成方案。
+     * 用户反馈：终端页缺少「全流程存入方案库」的入口。
+     */
+    private void saveCurrentAsPreset() {
+        java.util.List<ScriptItem> queue = Engine.INSTANCE.getScripts();
+        if (queue.isEmpty()) {
+            toast(getString(R.string.empty_queue_toast));
+            return;
+        }
+        // 默认名：时间戳，用户可改
+        String defName = new java.text.SimpleDateFormat("MM-dd HH:mm 方案", java.util.Locale.getDefault())
+                .format(new java.util.Date());
+
+        final android.widget.EditText et = new android.widget.EditText(requireContext());
+        et.setText(defName);
+        et.setSingleLine(true);
+        et.setTextSize(15);
+        et.setPadding(dp(20), dp(12), dp(20), dp(4));
+
+        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle(R.string.save_as_preset)
+                .setMessage(getString(R.string.save_preset_desc, queue.size()))
+                .setView(et)
+                .setPositiveButton(R.string.good, (d, w) -> {
+                    String name = et.getText().toString().trim();
+                    if (name.length() == 0) {
+                        name = defName;
+                    }
+                    doSavePreset(name, queue);
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void doSavePreset(String name, java.util.List<ScriptItem> queue) {
+        try {
+            // 深拷贝队列（避免之后改队列影响已存方案）
+            java.util.List<ScriptItem> copied = new java.util.ArrayList<>();
+            for (ScriptItem s : queue) {
+                copied.add(Json.INSTANCE.deepcopy(s));
+            }
+            Preset p = new Preset(name, copied, "");
+            Engine.INSTANCE.getPresets().add(p);
+            Store.INSTANCE.savePresets(requireContext(), Engine.INSTANCE.getPresets());
+            int answers = 0;
+            for (ScriptItem s : copied) {
+                answers += s.getRecordedInputs().size();
+            }
+            toast(getString(R.string.preset_saved_fmt, name, copied.size(), answers));
+        } catch (Exception e) {
+            toast("保存失败：" + e.getMessage());
+        }
+    }
+
+    private void toast(String s) {
+        android.widget.Toast.makeText(requireContext(), s, android.widget.Toast.LENGTH_SHORT).show();
     }
 
     /** 增量渲染：与 QueueFragment 同一套「带标记长度」游标策略 */
@@ -211,6 +356,20 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
         Editable dst = termView.getEditableText();
         if (dst == null) {
             return;
+        }
+        // buffer 为空 → 显示欢迎语（版本 + 队列状态 + 操作提示），不留空白
+        if (buf.length() == 0) {
+            if (renderedChars != -1) {
+                dst.clear();
+                dst.append(Engine.INSTANCE.welcomeText());
+                renderedChars = -1;      // -1 表示当前显示的是欢迎语
+            }
+            return;
+        }
+        // 当前显示的是欢迎语，但已有真实输出 → 清屏后从头渲染
+        if (renderedChars < 0) {
+            dst.clear();
+            renderedChars = 0;
         }
         if (buf.length() < renderedChars) {
             renderedChars = 0;
@@ -272,7 +431,42 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
         if (code == 'w') {
             return R.color.term_warn;
         }
+        if (code == 'n') {
+            return 0;
+        }
+        // ANSI 常规色 0-7 与亮色 A-H（与 QueueFragment 保持完全一致，避免两页配色不同）
+        if ('0' <= code && code < '8') {
+            return ansiRes(code - '0', false);
+        }
+        if ('A' <= code && code < 'I') {
+            return ansiRes(code - 'A', true);
+        }
         return 0;
+    }
+
+    private int ansiRes(int i, boolean bright) {
+        if (bright) {
+            switch (i) {
+                case 0: return R.color.term_ansi_90;
+                case 1: return R.color.term_ansi_91;
+                case 2: return R.color.term_ansi_92;
+                case 3: return R.color.term_ansi_93;
+                case 4: return R.color.term_ansi_94;
+                case 5: return R.color.term_ansi_95;
+                case 6: return R.color.term_ansi_96;
+                default: return R.color.term_ansi_97;
+            }
+        }
+        switch (i) {
+            case 0: return R.color.term_ansi_30;
+            case 1: return R.color.term_ansi_31;
+            case 2: return R.color.term_ansi_32;
+            case 3: return R.color.term_ansi_33;
+            case 4: return R.color.term_ansi_34;
+            case 5: return R.color.term_ansi_35;
+            case 6: return R.color.term_ansi_36;
+            default: return R.color.term_ansi_37;
+        }
     }
 
     private int color(int resId) {

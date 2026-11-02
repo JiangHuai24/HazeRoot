@@ -1,22 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  文件列表项 · 方案 A′（按 UI 规格书实测推导，贴 MT 但有呼吸）
+  ──────────────────────────────────────────────
+  核心改动（只调数值仍会挤，必须配套结构改造）：
+    ① 行高 56→52dp，图标 24→18dp（图标/字面比 1.97×→1.50×）
+    ② 副行从「-rwxr-xr-x · 3.4 KB」单串拆成**双列**：权限(左,可省) + 大小(右,定宽44dp)
+       填充率 90.7%→74.7%
+    ③ 名称**尾部省略**（禁用中间截断），includeFontPadding=false
+    ④ 行间分割线**默认去掉**（一屏 11 条会把列表切成表格栅格）
+-->
 <FrameLayout android:layout_width="fill_parent" android:layout_height="wrap_content"
   xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 左滑露出的操作按钮（MT 风格：多选 / 复制 / 移动 / 删除） -->
     <LinearLayout android:layout_gravity="end" android:orientation="horizontal" android:id="@id/fButtons" android:layout_width="wrap_content" android:layout_height="fill_parent">
-        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/accent" android:gravity="center" android:id="@id/fbEnqueue" android:background="@color/accent_tint8" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/sw_enqueue" />
-        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/fbCopy" android:background="@color/bg_soft" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/sw_copy" />
-        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/fbMove" android:background="@color/bg_soft" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/sw_move" />
-        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/error_text" android:gravity="center" android:id="@id/fbDelete" android:background="@color/error_tint" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/delete" />
+        <TextView android:textSize="12.0sp" android:textColor="@color/accent" android:gravity="center" android:id="@id/fbEnqueue" android:background="@color/accent_tint8" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/sw_multi" />
+        <TextView android:textSize="12.0sp" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/fbCopy" android:background="@color/bg_soft" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/sw_copy" />
+        <TextView android:textSize="12.0sp" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/fbMove" android:background="@color/bg_soft" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/sw_move" />
+        <TextView android:textSize="12.0sp" android:textColor="@color/error_text" android:gravity="center" android:id="@id/fbDelete" android:background="@color/error_tint" android:layout_width="48.0dip" android:layout_height="fill_parent" android:text="@string/delete" />
     </LinearLayout>
-    <!-- 修复（R3/R6/R1 交叉确认）：
-         ① fName 由 ellipsize=end 改 middle —— 保住 .sh/.apk 等关键扩展名
-         ② 行高由 6dp 提到 10dp，minHeight 56dp —— 触控目标与呼吸感
-         ③ fBadge 由 24dp 提到 32dp —— 图标达到「列表主图标」量级
-         ④ fMeta 由 10sp 提到 12sp —— 10sp 在 5 寸屏上接近不可读 -->
-    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/fgContent" android:background="@drawable/bg_file_fg" android:paddingLeft="12.0dip" android:paddingTop="10.0dip" android:paddingRight="10.0dip" android:paddingBottom="10.0dip" android:minHeight="56.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content">
-        <ImageView android:id="@id/fBadge" android:layout_width="32.0dip" android:layout_height="32.0dip" android:scaleType="fitCenter" />
-        <LinearLayout android:orientation="vertical" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_marginLeft="10.0dip" android:layout_weight="1.0">
-            <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="@color/label" android:ellipsize="middle" android:id="@id/fName" android:layout_width="fill_parent" android:layout_height="wrap_content" android:singleLine="true" />
-            <TextView android:textSize="12.0sp" android:textColor="@color/label_tertiary" android:ellipsize="end" android:id="@id/fMeta" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="2.0dip" android:singleLine="true" android:fontFamily="monospace" />
+
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/fgContent" android:background="@drawable/bg_file_fg" android:paddingLeft="12.0dip" android:paddingTop="3.0dip" android:paddingRight="8.0dip" android:paddingBottom="3.0dip" android:minHeight="52.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content">
+
+        <!-- 图标 18dp（不再是 24dp，避免视觉重心落在图标上） -->
+        <ImageView android:id="@id/fBadge" android:layout_width="18.0dip" android:layout_height="18.0dip" android:scaleType="fitCenter" android:importantForAccessibility="no" />
+
+        <!-- 文本列：起始 = 12 + 18 + 8 = 38dp -->
+        <LinearLayout android:orientation="vertical" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_marginLeft="8.0dip" android:layout_weight="1.0" android:baselineAligned="false">
+
+            <!-- 名称：14sp / 单行 / 尾部省略 -->
+            <TextView android:textSize="14.0sp" android:textColor="@color/label" android:ellipsize="end" android:id="@id/fName" android:maxLines="1" android:includeFontPadding="false" android:layout_width="fill_parent" android:layout_height="wrap_content" android:minHeight="20.0dip" />
+
+            <!-- 副行：拆双列 —— 权限左(可省) + 大小右(定宽44dp，等宽数字) -->
+            <LinearLayout android:orientation="horizontal" android:gravity="center_vertical" android:layout_width="fill_parent" android:layout_height="wrap_content" android:baselineAligned="false">
+
+                <TextView android:textSize="11.0sp" android:textColor="@color/label_tertiary" android:ellipsize="end" android:id="@id/fMeta" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="1.0" android:singleLine="true" android:includeFontPadding="false" android:letterSpacing="0.02" />
+
+                <TextView android:textSize="11.0sp" android:textColor="@color/label_tertiary" android:gravity="end" android:id="@id/fSize" android:layout_width="52.0dip" android:layout_height="wrap_content" android:layout_marginLeft="4.0dip" android:maxLines="1" android:singleLine="true" android:includeFontPadding="false" android:fontFeatureSettings="tnum" android:textAlignment="viewEnd" />
+            </LinearLayout>
         </LinearLayout>
+
+        <!-- 目录尾随箭头 12dp，仅目录可见 -->
+        <TextView android:textSize="12.0sp" android:textColor="@color/label_tertiary" android:gravity="center" android:id="@id/fArrow" android:visibility="gone" android:layout_width="12.0dip" android:layout_height="match_parent" android:text="›" />
     </LinearLayout>
 </FrameLayout>

@@ -61,6 +61,9 @@ public final class HomeFragment extends Fragment {
 
         root.addView(brandRow);
 
+        // ===== 流动公告（走马灯） =====
+        addBlock(root, buildNoticeBar(), 16);
+
         // ===== 一句话介绍 =====
         TextView intro = text("Android 的通用 root 脚本执行器。\n把「每次手动敲一堆回答」变成「点一下跑完」。", 13, false, R.color.label_secondary);
         intro.setLineSpacing(dp(4), 1f);
@@ -122,6 +125,59 @@ public final class HomeFragment extends Fragment {
             return "2.8.4";
         }
     }
+
+    // ===== 流动公告 =====
+
+    private boolean marqueeRunning = false;
+
+    /**
+     * 流动公告条：单行走马灯 + 淡色描边。
+     * 内容目前为内置公告；后续可扩展为从 GitHub Release 拉取（离线时用本地兜底）。
+     */
+    private View buildNoticeBar() {
+        LinearLayout bar = new LinearLayout(requireContext());
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setBackgroundResource(R.drawable.bg_notice);
+        bar.setPadding(dp(10), dp(7), dp(10), dp(7));
+
+        // 左侧小圆点（品牌色，示意「公告」）
+        View dot = new View(requireContext());
+        dot.setBackgroundResource(R.drawable.dot_running);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(5), dp(5));
+        bar.addView(dot, dlp);
+
+        final TextView tv = new TextView(requireContext());
+        tv.setText(NOTICE_TEXT);
+        tv.setTextSize(12);
+        tv.setSingleLine(true);
+        tv.setTextColor(color(R.color.label_secondary));
+        // 走马灯：必须 ellipsize=MARQUEE + marqueeRepeatLimit + setSelected(true)
+        tv.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+        tv.setMarqueeRepeatLimit(-1);
+        tv.setHorizontallyScrolling(true);
+        tv.setFocusable(true);
+        tv.setFocusableInTouchMode(true);
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tlp.leftMargin = dp(8);
+        bar.addView(tv, tlp);
+
+        // 启动走马灯
+        tv.post(() -> {
+            if (tv.getLayout() != null && tv.getLayout().getEllipsisCount(0) > 0) {
+                tv.setSelected(true);
+                marqueeRunning = true;
+            } else {
+                // 文字没超过宽度时不需要滚动
+                tv.setEllipsize(null);
+            }
+        });
+        return bar;
+    }
+
+    private static final String NOTICE_TEXT =
+            "v2.8.4 已发布  ·  修复终端显示不全 / 录制重放闭环  ·  新增设备页（温度·限频·刷新率）  ·  底部导航改版  ·  开源地址 github.com/JiangHuai24/HazeRoot";
 
     // ===== 小工具 =====
 

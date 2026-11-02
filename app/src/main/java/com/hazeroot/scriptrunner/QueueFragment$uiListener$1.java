@@ -60,108 +60,72 @@ public final class QueueFragment$uiListener$1 implements Engine.Listener {
         switch (type.hashCode()) {
             case -979805852:
                 if (type.equals("prompt")) {
-                    textView = this$0.promptView;
-                    if (textView == null) {
-                        Intrinsics.throwUninitializedPropertyAccessException("promptView");
-                        textView = null;
+                    // 终端相关控件已迁到 TerminalFragment；本页无这些控件时直接跳过
+                    if (this$0.promptView == null || this$0.promptRow == null) {
+                        break;
                     }
-                    textView.setText(payload);
-                    view = this$0.promptRow;
-                    if (view == null) {
-                        Intrinsics.throwUninitializedPropertyAccessException("promptRow");
-                        view = null;
-                    }
-                    view.setVisibility((payload.length() == 0) == true ? 8 : 0);
-                    if ((payload.length() > 0) && Engine.INSTANCE.getRunningNow()) {
+                    this$0.promptView.setText(payload);
+                    this$0.promptRow.setVisibility(payload.length() == 0 ? 8 : 0);
+                    if (payload.length() > 0 && Engine.INSTANCE.getRunningNow()) {
+                        // 执行中检测到提问 → 切到终端页让用户回答
                         FragmentActivity activity = this$0.getActivity();
                         MainActivity mainActivity = activity instanceof MainActivity ? (MainActivity) activity : null;
                         if (mainActivity != null) {
-                            mainActivity.switchTo(R.id.navQueue);
+                            mainActivity.switchTo(R.id.navTerminal);
                         }
-                    }
-                    scrollView = this$0.termScroll;
-                    if (scrollView == null) {
-                        Intrinsics.throwUninitializedPropertyAccessException("termScroll");
-                        scrollView = null;
-                    }
-                    if (!scrollView.canScrollVertically(1)) {
-                        scrollView2 = this$0.termScroll;
-                        if (scrollView2 == null) {
-                            Intrinsics.throwUninitializedPropertyAccessException("termScroll");
-                        } else {
-                            scrollView3 = scrollView2;
-                        }
-                        scrollView3.post(new Runnable() { // from class: com.hazeroot.scriptrunner.QueueFragment$uiListener$1$$ExternalSyntheticLambda1
-                            @Override // java.lang.Runnable
-                            public final void run() {
-                                QueueFragment$uiListener$1.onEvent$lambda$1$lambda$0(this$0);
-                            }
-                        });
-                        break;
                     }
                 }
                 break;
             case 107332:
                 if (type.equals("log")) {
+                    // 视图可能已销毁（hide/show 或 Activity 重建），全部做空判断
+                    if (this$0.promptView == null || this$0.promptRow == null) {
+                        break;
+                    }
                     this$0.syncTerm();
                     textView2 = this$0.promptView;
                     if (textView2 == null) {
-                        Intrinsics.throwUninitializedPropertyAccessException("promptView");
-                        textView2 = null;
+                        break;
                     }
                     CharSequence text = textView2.getText();
                     Intrinsics.checkNotNullExpressionValue(text, "getText(...)");
                     if (text.length() > 0) {
                         textView3 = this$0.promptView;
                         if (textView3 == null) {
-                            Intrinsics.throwUninitializedPropertyAccessException("promptView");
-                            textView3 = null;
+                            break;
                         }
                         textView3.setText("");
                         view2 = this$0.promptRow;
                         if (view2 == null) {
-                            Intrinsics.throwUninitializedPropertyAccessException("promptRow");
-                        } else {
-                            view5 = view2;
+                            break;
                         }
-                        view5.setVisibility(8);
-                        break;
+                        view2.setVisibility(8);
                     }
                 }
                 break;
             case 3089282:
                 if (type.equals("done")) {
-                    textView4 = this$0.promptView;
-                    if (textView4 == null) {
-                        Intrinsics.throwUninitializedPropertyAccessException("promptView");
-                        textView4 = null;
+                    if (this$0.promptView != null) {
+                        this$0.promptView.setText("");
                     }
-                    textView4.setText("");
-                    view3 = this$0.promptRow;
-                    if (view3 == null) {
-                        Intrinsics.throwUninitializedPropertyAccessException("promptRow");
-                    } else {
-                        view4 = view3;
+                    if (this$0.promptRow != null) {
+                        this$0.promptRow.setVisibility(8);
                     }
-                    view4.setVisibility(8);
                     Engine.INSTANCE.log("====== " + payload + " ======", Intrinsics.areEqual(payload, this$0.getString(R.string.queue_aborted)) ? Engine.S_WARN : Engine.S_CMD);
                     this$0.refreshButtons();
                     Ui ui = Ui.INSTANCE;
-                    Context requireContext = this$0.requireContext();
-                    Intrinsics.checkNotNullExpressionValue(requireContext, "requireContext(...)");
-                    ui.toast(requireContext, payload);
+                    Context requireContext = this$0.getContext();
+                    if (requireContext != null) {
+                        ui.toast(requireContext, payload);
+                    }
                     break;
                 }
                 break;
             case 109757585:
                 if (type.equals("state")) {
-                    scriptAdapter = this$0.adapter;
-                    if (scriptAdapter == null) {
-                        Intrinsics.throwUninitializedPropertyAccessException("adapter");
-                    } else {
-                        scriptAdapter2 = scriptAdapter;
+                    if (this$0.adapter != null) {
+                        this$0.adapter.notifyDataSetChanged();
                     }
-                    scriptAdapter2.notifyDataSetChanged();
                     this$0.refreshButtons();
                     break;
                 }
