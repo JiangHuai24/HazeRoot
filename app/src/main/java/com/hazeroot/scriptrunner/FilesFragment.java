@@ -2915,7 +2915,7 @@ public final class FilesFragment extends Fragment {
     }
 
     /* JADX INFO: Access modifiers changed from: private */
-    public static final void renameDialog$lambda$76(EditText et, FsEntry e, FilesFragment this$0, Pane pane, DialogInterface dialogInterface, int i) {
+    public static final void renameDialog$lambda$76(EditText et, FsEntry e, final FilesFragment this$0, final Pane pane, DialogInterface dialogInterface, int i) {
         Intrinsics.checkNotNullParameter(et, "$et");
         Intrinsics.checkNotNullParameter(e, "$e");
         Intrinsics.checkNotNullParameter(this$0, "this$0");
@@ -2930,17 +2930,34 @@ public final class FilesFragment extends Fragment {
             this$0.toast(string);
             return;
         }
-        String r = Engine.INSTANCE.exec("mv " + Engine.INSTANCE.q(e.getPath()) + " " + Engine.INSTANCE.q(Kt.substringBeforeLast(e.getPath(), '/', (String) null, 2, (Object) null) + "/" + nn));
-        if (r == null) {
-            String string2 = this$0.getString(R.string.rename_fail);
-            Intrinsics.checkNotNullExpressionValue(string2, "getString(...)");
-            this$0.toast(string2);
-        } else {
-            String string3 = this$0.getString(R.string.renamed);
-            Intrinsics.checkNotNullExpressionValue(string3, "getString(...)");
-            this$0.toast(string3);
-            Pane.load$default(pane, pane.getDir(), 0, 2, null);
-        }
+        // 修复 ANR：mv 走 su（含重试+sleep），不能在主线程执行
+        final String src = e.getPath();
+        final String dst = Kt.substringBeforeLast(e.getPath(), '/', (String) null, 2, (Object) null) + "/" + nn;
+        new Thread(new Runnable() {
+            @Override // java.lang.Runnable
+            public final void run() {
+                final String r = Engine.INSTANCE.exec("mv " + Engine.INSTANCE.q(src) + " " + Engine.INSTANCE.q(dst));
+                Activity act = this$0.getActivity();
+                if (act == null) {
+                    return;
+                }
+                act.runOnUiThread(new Runnable() {
+                    @Override // java.lang.Runnable
+                    public final void run() {
+                        if (r == null) {
+                            String string2 = this$0.getString(R.string.rename_fail);
+                            Intrinsics.checkNotNullExpressionValue(string2, "getString(...)");
+                            this$0.toast(string2);
+                        } else {
+                            String string3 = this$0.getString(R.string.renamed);
+                            Intrinsics.checkNotNullExpressionValue(string3, "getString(...)");
+                            this$0.toast(string3);
+                            Pane.load$default(pane, pane.getDir(), 0, 2, null);
+                        }
+                    }
+                });
+            }
+        }).start();
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -3036,7 +3053,7 @@ public final class FilesFragment extends Fragment {
     }
 
     /* JADX INFO: Access modifiers changed from: private */
-    public static final void newDialog$lambda$81$lambda$80(EditText et, FilesFragment this$0, String kind, Pane pane, DialogInterface dialogInterface, int i) {
+    public static final void newDialog$lambda$81$lambda$80(EditText et, final FilesFragment this$0, String kind, final Pane pane, DialogInterface dialogInterface, int i) {
         String cmd;
         Intrinsics.checkNotNullParameter(et, "$et");
         Intrinsics.checkNotNullParameter(this$0, "this$0");
@@ -3050,19 +3067,34 @@ public final class FilesFragment extends Fragment {
                 } else {
                     cmd = "touch " + Engine.INSTANCE.q(pane.getDir() + "/" + n) + " && chmod 664 " + Engine.INSTANCE.q(pane.getDir() + "/" + n);
                 }
-                String r = Engine.INSTANCE.exec(cmd);
-                if (r == null) {
-                    String string = this$0.getString(R.string.create_fail);
-                    Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
-                    this$0.toast(string);
-                    return;
-                } else {
-                    String string2 = this$0.getString(R.string.created);
-                    Intrinsics.checkNotNullExpressionValue(string2, "getString(...)");
-                    this$0.toast(string2);
-                    Pane.load$default(pane, pane.getDir(), 0, 2, null);
-                    return;
-                }
+                // 修复 ANR：mkdir/touch/chmod 走 su，不能在主线程执行
+                final String cmdF = cmd;
+                new Thread(new Runnable() {
+                    @Override // java.lang.Runnable
+                    public final void run() {
+                        final String r = Engine.INSTANCE.exec(cmdF);
+                        Activity act = this$0.getActivity();
+                        if (act == null) {
+                            return;
+                        }
+                        act.runOnUiThread(new Runnable() {
+                            @Override // java.lang.Runnable
+                            public final void run() {
+                                if (r == null) {
+                                    String string = this$0.getString(R.string.create_fail);
+                                    Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
+                                    this$0.toast(string);
+                                } else {
+                                    String string2 = this$0.getString(R.string.created);
+                                    Intrinsics.checkNotNullExpressionValue(string2, "getString(...)");
+                                    this$0.toast(string2);
+                                    Pane.load$default(pane, pane.getDir(), 0, 2, null);
+                                }
+                            }
+                        });
+                    }
+                }).start();
+                return;
             }
             String string3 = this$0.getString(R.string.err_slash);
             Intrinsics.checkNotNullExpressionValue(string3, "getString(...)");
@@ -3350,17 +3382,35 @@ public final class FilesFragment extends Fragment {
             this$0.toast(string);
             return;
         }
-        String ok = Engine.INSTANCE.exec("chmod " + code + " " + Engine.INSTANCE.q(e.getPath()));
-        if (ok == null) {
-            String string2 = this$0.getString(R.string.chmod_fail);
-            Intrinsics.checkNotNullExpressionValue(string2, "getString(...)");
-            this$0.toast(string2);
-        } else {
-            String string3 = this$0.getString(R.string.chmod_done_fmt, from, code);
-            Intrinsics.checkNotNullExpressionValue(string3, "getString(...)");
-            this$0.toast(string3);
-            Pane.load$default(pane, pane.getDir(), 0, 2, null);
-        }
+        // 修复 ANR：chmod 走 su，不能在主线程执行
+        final String cmdF = "chmod " + code + " " + Engine.INSTANCE.q(e.getPath());
+        final String codeF = code;
+        final String fromF = from;
+        new Thread(new Runnable() {
+            @Override // java.lang.Runnable
+            public final void run() {
+                final String ok = Engine.INSTANCE.exec(cmdF);
+                Activity act = this$0.getActivity();
+                if (act == null) {
+                    return;
+                }
+                act.runOnUiThread(new Runnable() {
+                    @Override // java.lang.Runnable
+                    public final void run() {
+                        if (ok == null) {
+                            String string2 = this$0.getString(R.string.chmod_fail);
+                            Intrinsics.checkNotNullExpressionValue(string2, "getString(...)");
+                            this$0.toast(string2);
+                        } else {
+                            String string3 = this$0.getString(R.string.chmod_done_fmt, fromF, codeF);
+                            Intrinsics.checkNotNullExpressionValue(string3, "getString(...)");
+                            this$0.toast(string3);
+                            Pane.load$default(pane, pane.getDir(), 0, 2, null);
+                        }
+                    }
+                });
+            }
+        }).start();
     }
 
     /* JADX INFO: Access modifiers changed from: private */
