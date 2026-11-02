@@ -1,46 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  HazeRoot 主壳 · 结构大改版
-  改动：
-    1. 底部导航改「江南工具箱」式：薄 52dp、单色、无彩色胶囊、无厚卡片容器
-    2. 图标不再染品牌色，只做「选中=主色文字图标 / 未选中=灰」的明度区分
-    3. Tab 从 3 个扩到 4 个：首页 / 队列 / 终端 / 文件
-    4. 导航贴底 + 顶部 1px 分割线，不用浮岛
+  HazeRoot 主壳 · 底部导航按江南工具箱实测复刻
+
+  实测参照（从 32 帧视频逐帧读出）：
+    - 悬浮胶囊容器：圆角药丸，左右留边，不贴底
+    - 选中态 = 图标外包一个【品牌色实心圆】，图标变白，文字变亮
+    - 未选中 = 纯灰图标 + 灰文字，无任何背景
+    - 图标在上、文字在下
+    - 容器高度 ~52dp
 -->
 <LinearLayout android:orientation="vertical" android:background="@color/bg_page" android:layout_width="fill_parent" android:layout_height="fill_parent"
   xmlns:android="http://schemas.android.com/apk/res/android">
 
     <FrameLayout android:id="@id/navContainer" android:layout_width="fill_parent" android:layout_height="0.0dip" android:layout_weight="1.0" />
 
-    <!-- ===== 底部导航（江南式：薄、单色、贴底） ===== -->
-    <View android:background="@color/divider" android:layout_width="fill_parent" android:layout_height="1.0px" />
+    <!-- ===== 悬浮胶囊导航 ===== -->
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/bottomNav" android:background="@drawable/bg_nav_island" android:layout_width="fill_parent" android:layout_height="56.0dip" android:layout_marginLeft="16.0dip" android:layout_marginRight="16.0dip" android:layout_marginBottom="14.0dip" android:elevation="6.0dip">
 
-    <LinearLayout android:orientation="horizontal" android:id="@id/bottomNav" android:background="@color/bg_page" android:layout_width="fill_parent" android:layout_height="52.0dip">
-
-        <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/tabHome" android:background="?selectableItemBackground" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="fill_parent" android:layout_weight="1.0">
-            <ImageView android:id="@id/iconHome" android:layout_width="21.0dip" android:layout_height="21.0dip" android:src="@drawable/ic_home_nav" android:contentDescription="@string/tab_home" />
-            <TextView android:textSize="10.0sp" android:id="@id/labelHome" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2.0dip" android:text="@string/tab_home" />
+        <!-- 首页 -->
+        <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/tabHome" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="fill_parent" android:layout_weight="1.0">
+            <FrameLayout android:id="@id/blobHome" android:layout_width="30.0dip" android:layout_height="30.0dip">
+                <ImageView android:layout_gravity="center" android:id="@id/iconHome" android:layout_width="19.0dip" android:layout_height="19.0dip" android:src="@drawable/ic_home_nav" android:contentDescription="@string/tab_home" />
+            </FrameLayout>
+            <TextView android:textSize="10.0sp" android:id="@id/labelHome" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/tab_home" />
         </LinearLayout>
 
-        <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/tabQueue" android:background="?selectableItemBackground" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="fill_parent" android:layout_weight="1.0">
-            <!-- 隐藏占位：MainActivity 仍会 findViewById(pillQueue)，不能删 -->
+        <!-- 队列 -->
+        <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/tabQueue" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="fill_parent" android:layout_weight="1.0">
             <View android:id="@id/pillQueue" android:visibility="gone" android:layout_width="0.0dip" android:layout_height="0.0dip" />
-            <ImageView android:id="@id/iconQueue" android:layout_width="21.0dip" android:layout_height="21.0dip" android:src="@drawable/ic_nav_queue" android:contentDescription="@string/tab_queue" />
-            <TextView android:textSize="10.0sp" android:id="@id/labelQueue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2.0dip" android:text="@string/tab_queue" />
+            <FrameLayout android:id="@id/blobQueue" android:layout_width="30.0dip" android:layout_height="30.0dip">
+                <ImageView android:layout_gravity="center" android:id="@id/iconQueue" android:layout_width="19.0dip" android:layout_height="19.0dip" android:src="@drawable/ic_nav_queue" android:contentDescription="@string/tab_queue" />
+            </FrameLayout>
+            <TextView android:textSize="10.0sp" android:id="@id/labelQueue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/tab_queue" />
         </LinearLayout>
 
-        <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/tabTerminal" android:background="?selectableItemBackground" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="fill_parent" android:layout_weight="1.0">
-            <ImageView android:id="@id/iconTerminal" android:layout_width="21.0dip" android:layout_height="21.0dip" android:src="@drawable/ic_terminal_nav" android:contentDescription="@string/tab_terminal" />
-            <TextView android:textSize="10.0sp" android:id="@id/labelTerminal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2.0dip" android:text="@string/tab_terminal" />
+        <!-- 终端 -->
+        <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/tabTerminal" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="fill_parent" android:layout_weight="1.0">
+            <FrameLayout android:id="@id/blobTerminal" android:layout_width="30.0dip" android:layout_height="30.0dip">
+                <ImageView android:layout_gravity="center" android:id="@id/iconTerminal" android:layout_width="19.0dip" android:layout_height="19.0dip" android:src="@drawable/ic_terminal_nav" android:contentDescription="@string/tab_terminal" />
+            </FrameLayout>
+            <TextView android:textSize="10.0sp" android:id="@id/labelTerminal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/tab_terminal" />
         </LinearLayout>
 
-        <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/tabFiles" android:background="?selectableItemBackground" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="fill_parent" android:layout_weight="1.0">
+        <!-- 文件 -->
+        <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/tabFiles" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="fill_parent" android:layout_weight="1.0">
             <View android:id="@id/pillFiles" android:visibility="gone" android:layout_width="0.0dip" android:layout_height="0.0dip" />
-            <ImageView android:id="@id/iconFiles" android:layout_width="21.0dip" android:layout_height="21.0dip" android:src="@drawable/ic_nav_files" android:contentDescription="@string/tab_files" />
-            <TextView android:textSize="10.0sp" android:id="@id/labelFiles" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2.0dip" android:text="@string/tab_files" />
+            <FrameLayout android:id="@id/blobFiles" android:layout_width="30.0dip" android:layout_height="30.0dip">
+                <ImageView android:layout_gravity="center" android:id="@id/iconFiles" android:layout_width="19.0dip" android:layout_height="19.0dip" android:src="@drawable/ic_nav_files" android:contentDescription="@string/tab_files" />
+            </FrameLayout>
+            <TextView android:textSize="10.0sp" android:id="@id/labelFiles" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/tab_files" />
         </LinearLayout>
 
-        <!-- 保留旧 id 占位（PresetsFragment 相关代码可能引用，隐藏避免空指针） -->
+        <!-- 隐藏占位：旧代码仍引用 -->
         <LinearLayout android:id="@id/tabPresets" android:visibility="gone" android:layout_width="0.0dip" android:layout_height="0.0dip">
             <View android:id="@id/pillPresets" android:layout_width="0.0dip" android:layout_height="0.0dip" />
             <ImageView android:id="@id/iconPresets" android:layout_width="0.0dip" android:layout_height="0.0dip" />

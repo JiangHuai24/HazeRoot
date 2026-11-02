@@ -64,20 +64,30 @@ public final class MainActivity extends AppCompatActivity {
     /* compiled from: MainActivity.kt */
     
     private static final class Tab {
+        private final View blob;
         private final ImageView icon;
         private final TextView label;
         private final View pill;
         private final View root;
 
         public Tab(View root, View pill, ImageView icon, TextView label) {
+            this(root, pill, null, icon, label);
+        }
+
+        public Tab(View root, View pill, View blob, ImageView icon, TextView label) {
             Intrinsics.checkNotNullParameter(root, "root");
             Intrinsics.checkNotNullParameter(pill, "pill");
             Intrinsics.checkNotNullParameter(icon, "icon");
             Intrinsics.checkNotNullParameter(label, "label");
             this.root = root;
             this.pill = pill;
+            this.blob = blob;
             this.icon = icon;
             this.label = label;
+        }
+
+        public final View getBlob() {
+            return this.blob;
         }
 
         public final View getPill() {
@@ -179,7 +189,7 @@ public final class MainActivity extends AppCompatActivity {
         Intrinsics.checkNotNullExpressionValue(findViewById4, "findViewById(...)");
         View findViewById5 = findViewById(R.id.labelQueue);
         Intrinsics.checkNotNullExpressionValue(findViewById5, "findViewById(...)");
-        linkedHashMap.put(valueOf, new Tab(findViewById2, findViewById3, (ImageView) findViewById4, (TextView) findViewById5));
+        linkedHashMap.put(valueOf, new Tab(findViewById2, findViewById3, findViewById(R.id.blobQueue), (ImageView) findViewById4, (TextView) findViewById5));
         LinkedHashMap<Integer, Tab> linkedHashMap2 = this.tabs;
         Integer valueOf2 = Integer.valueOf(R.id.tabFiles);
         View findViewById6 = findViewById(R.id.tabFiles);
@@ -190,14 +200,15 @@ public final class MainActivity extends AppCompatActivity {
         Intrinsics.checkNotNullExpressionValue(findViewById8, "findViewById(...)");
         View findViewById9 = findViewById(R.id.labelFiles);
         Intrinsics.checkNotNullExpressionValue(findViewById9, "findViewById(...)");
-        linkedHashMap2.put(valueOf2, new Tab(findViewById6, findViewById7, (ImageView) findViewById8, (TextView) findViewById9));
+        linkedHashMap2.put(valueOf2, new Tab(findViewById6, findViewById7, findViewById(R.id.blobFiles), (ImageView) findViewById8, (TextView) findViewById9));
         // 新增 Tab：首页
         View tabHomeRoot = findViewById(R.id.tabHome);
         View iconHomeV = findViewById(R.id.iconHome);
         View labelHomeV = findViewById(R.id.labelHome);
         if (tabHomeRoot != null && iconHomeV != null && labelHomeV != null) {
             this.tabs.put(Integer.valueOf(R.id.tabHome),
-                    new Tab(tabHomeRoot, tabHomeRoot, (ImageView) iconHomeV, (TextView) labelHomeV));
+                    new Tab(tabHomeRoot, tabHomeRoot, findViewById(R.id.blobHome),
+                            (ImageView) iconHomeV, (TextView) labelHomeV));
         }
         // 新增 Tab：终端
         View tabTermRoot = findViewById(R.id.tabTerminal);
@@ -205,7 +216,8 @@ public final class MainActivity extends AppCompatActivity {
         View labelTermV = findViewById(R.id.labelTerminal);
         if (tabTermRoot != null && iconTermV != null && labelTermV != null) {
             this.tabs.put(Integer.valueOf(R.id.tabTerminal),
-                    new Tab(tabTermRoot, tabTermRoot, (ImageView) iconTermV, (TextView) labelTermV));
+                    new Tab(tabTermRoot, tabTermRoot, findViewById(R.id.blobTerminal),
+                            (ImageView) iconTermV, (TextView) labelTermV));
         }
         LinkedHashMap<Integer, Tab> linkedHashMap3 = this.tabs;
         Integer valueOf3 = Integer.valueOf(R.id.tabPresets);
@@ -335,20 +347,32 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private final void setTabActive(Tab tab, boolean active) {
-        // 底部导航（江南工具箱式）：单色极简，**图标不染品牌色**。
-        // 选中 = 主文字色（亮），未选中 = 三级灰；只改明度，不改色相。
-        int color = ContextCompat.getColor(this, active ? R.color.label : R.color.label_tertiary);
+        // 底部导航：按江南工具箱实测复刻
+        //   选中 = 图标外包一个品牌色实心圆，图标变白，文字变亮变粗
+        //   未选中 = 纯灰图标 + 灰文字，无任何背景
+        int onColor = ContextCompat.getColor(this, R.color.label);
+        int offColor = ContextCompat.getColor(this, R.color.label_tertiary);
+        int white = ContextCompat.getColor(this, R.color.label_on_primary);
+
         View pill = tab.getPill();
         if (pill != null) {
             pill.setBackground(null);
         }
+
+        // blob = 图标外层的圆形容器
+        View blob = tab.getBlob();
+        if (blob != null) {
+            blob.setBackgroundResource(active ? R.drawable.bg_nav_blob : 0);
+        }
+
         ImageView icon = tab.getIcon();
         if (icon != null && icon.getDrawable() != null) {
-            DrawableCompat.setTint(icon.getDrawable().mutate(), color);
+            DrawableCompat.setTint(icon.getDrawable().mutate(), active ? white : offColor);
         }
+
         TextView label = tab.getLabel();
         if (label != null) {
-            label.setTextColor(color);
+            label.setTextColor(active ? onColor : offColor);
             label.setTypeface(null, active ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         }
     }

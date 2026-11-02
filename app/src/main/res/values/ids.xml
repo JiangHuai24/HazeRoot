@@ -366,4 +366,8 @@
     <item type="id" name="tabTerminal" />
     <item type="id" name="iconTerminal" />
     <item type="id" name="labelTerminal" />
+    <item type="id" name="blobHome" />
+    <item type="id" name="blobQueue" />
+    <item type="id" name="blobTerminal" />
+    <item type="id" name="blobFiles" />
 </resources>

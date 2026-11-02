@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape
-  xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- 底部导航容器：悬浮胶囊（江南工具箱式）
+     - 圆角药丸形，比页面背景略亮的深色底
+     - 左右留边悬空，不贴底 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
     <solid android:color="@color/bg_elevated" />
-    <corners android:radius="20.0dip" />
+    <corners android:radius="26.0dip" />
 </shape>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 选中态圆形底：与江南工具箱的「蓝色圆 + 白色图标」一致 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="@color/accent" />
+</shape>

@@ -38,8 +38,12 @@ public final class HomeFragment extends Fragment {
         brandRow.setOrientation(LinearLayout.HORIZONTAL);
         brandRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        View badge = new View(requireContext());
+        // 品牌徽标：黑底 + 白色 H（保持原有黑白，不染品牌色）
+        android.widget.ImageView badge = new android.widget.ImageView(requireContext());
         badge.setBackgroundResource(R.drawable.bg_brand);
+        badge.setImageResource(R.drawable.ic_brand_h);
+        int bpad = dp(5);
+        badge.setPadding(bpad, bpad, bpad, bpad);
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(34), dp(34));
         brandRow.addView(badge, blp);
 
