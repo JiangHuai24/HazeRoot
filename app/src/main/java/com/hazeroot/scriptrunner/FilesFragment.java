@@ -1299,6 +1299,25 @@ public final class FilesFragment extends Fragment {
             return;
         }
         final Pane to = otherOf(pane);
+        final int total = this.selected.size();
+        // 修复（R3 S 级）：补「目标确认」——原实现直接对另一窗执行，用户不知道目标在哪。
+        String target = to.getDir();
+        String verb = move ? getString(R.string.move) : getString(R.string.copy);
+        new AlertDialog.Builder(requireContext())
+                .setTitle(verb + " " + total + " " + getString(R.string.items))
+                .setMessage(getString(R.string.copy_target_fmt, verb, target))
+                .setPositiveButton(getString(R.string.good), new DialogInterface.OnClickListener() {
+                    @Override // android.content.DialogInterface.OnClickListener
+                    public final void onClick(DialogInterface dialogInterface, int i) {
+                        doMultiCopyMove(pane, to, move);
+                    }
+                })
+                .setNegativeButton(getString(R.string.cancel), (DialogInterface.OnClickListener) null)
+                .show();
+    }
+
+    /* 真正执行批量复制/移动（已确认目标后调用） */
+    private final void doMultiCopyMove(final Pane pane, final Pane to, final boolean move) {
         final List paths = CollectionsKt.toList(this.selected);
         final int total = paths.size();
         new Thread(new Runnable() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda35

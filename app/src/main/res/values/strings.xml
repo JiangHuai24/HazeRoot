@@ -83,6 +83,8 @@
     <string name="clip_moved">已标记移动 · 到目标窗口长按空白处选「粘贴」</string>
     <string name="collapse_queue">收起队列</string>
     <string name="copy">复制</string>
+    <string name="items">项</string>
+    <string name="copy_target_fmt">%1$s到：\n%2$s\n\n确认执行？</string>
     <string name="copy_here">复制到本窗</string>
     <string name="copy_to_fmt">复制到%1$s</string>
     <string name="create_fail">创建失败</string>
