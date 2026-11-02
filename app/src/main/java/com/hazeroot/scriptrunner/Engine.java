@@ -62,6 +62,8 @@ public final class Engine {
     // 修复竞态：执行线程写、UI 线程读（abort/sendRaw），非 volatile 会导致读到过期进程，
     // 表现为「停止关错进程」「手动输入写进上一个进程」。
     private static volatile java.lang.Process currentProc;
+    // 当前正在执行的脚本路径（abort 时用于 pkill -f 递归清理残留进程树）
+    private static volatile String currentScriptPath = "";
     private static volatile boolean finalized;
     private static volatile boolean hadAutoInput;
     private static volatile long lastOutputAt;
@@ -806,10 +808,14 @@ public final class Engine {
         OutputStream outputStream;
         Log.d(TAG, "abort() 被调用 runningNow=" + runningNow);
         abortFlag = true;
+        // 修复「假停止」：currentProc 是 su/busybox script 外壳，
+        // destroy() 只杀外壳，内层脚本及其子进程会变孤儿继续跑（后台 CPU 100%）。
+        // Android 的 java.lang.Process 没有 pid()，改为按「启动时登记的脚本路径」用 pkill -f 递归清理。
+        java.lang.Process proc = currentProc;
+        final String runningScriptPath = currentScriptPath;
         try {
-            java.lang.Process process = currentProc;
-            if (process != null) {
-                process.destroy();
+            if (proc != null) {
+                proc.destroy();
             }
         } catch (Exception e) {
         }
@@ -822,11 +828,33 @@ public final class Engine {
         }
         try {
             java.lang.Process process3 = currentProc;
-            if (process3 == null || (inputStream = process3.getInputStream()) == null) {
-                return;
+            if (process3 != null && (inputStream = process3.getInputStream()) != null) {
+                inputStream.close();
             }
-            inputStream.close();
         } catch (Exception e3) {
+        }
+        // 递归清理残留进程树（按脚本路径精确匹配，避免误杀）
+        if (runningScriptPath != null && runningScriptPath.length() > 0) {
+            killProcessTreeByPath(runningScriptPath);
+        }
+    }
+
+    /**
+     * 按脚本路径杀掉所有相关残留进程（含内层 sh 脚本与子进程）。
+     * 用 pkill -f 精确匹配该脚本路径，先 TERM 后 KILL。
+     * 走 su 是因为目标进程由 root 启动。
+     */
+    private static void killProcessTreeByPath(String scriptPath) {
+        String quoted = "'" + scriptPath.replace("'", "'\\''") + "'";
+        String script =
+                "pkill -TERM -f " + quoted + " 2>/dev/null; "
+              + "sleep 0.3; "
+              + "pkill -KILL -f " + quoted + " 2>/dev/null; true";
+        try {
+            java.lang.Process kp = new ProcessBuilder("su", "-c", "sh -c " + INSTANCE.q(script))
+                    .redirectErrorStream(true).start();
+            kp.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception ignored) {
         }
     }
 
@@ -904,6 +932,7 @@ public final class Engine {
             return;
         }
         currentProc = proc;
+        currentScriptPath = s.getPath();
 
         // ---- 3. 静默看门狗线程（输出停滞时提示）----
         final Ref.BooleanRef runDone = new Ref.BooleanRef();
@@ -1127,6 +1156,7 @@ public final class Engine {
             log(msg, S_ERR);
         }
         currentProc = null;
+        currentScriptPath = "";
     }
 
     /* JADX INFO: Access modifiers changed from: private */
