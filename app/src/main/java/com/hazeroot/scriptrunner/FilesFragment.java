@@ -1744,12 +1744,20 @@ public final class FilesFragment extends Fragment {
                     }
                     break;
                 } else if (longFired.element) {
+                    // 修复（R3 的 S 级痛点）：长按语义对齐 MT —— 「进入多选并选中该项」，
+                    // 而不是弹单条操作菜单。原实现长按松手走 fileMenu，与 MT 肌肉记忆直接冲突
+                    // （想批量删文件，却弹出单文件的复制/移动菜单）。
                     Pane rowPaneL = paneOfRow(this$0, v);
                     rowPaneL.setActive();
-                    if (this$0.multiMode && this$0.selPane == rowPaneL) {
-                        this$0.multiMenu();
-                    } else {
-                        this$0.fileMenu($item);
+                    if (!this$0.multiMode || this$0.selPane != rowPaneL) {
+                        this$0.enterMulti(rowPaneL);
+                    }
+                    this$0.toggleSelect($item.getPath(), rowPaneL);
+                    this$0.showMultiBar();
+                    rowPaneL.refreshSel();
+                    try {
+                        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                    } catch (Exception ignored) {
                     }
                     break;
                 } else if (ev.getActionMasked() == 1) {
