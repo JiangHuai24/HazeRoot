@@ -1099,6 +1099,24 @@ public final class Engine {
                         continue;
                     }
                     if (c == '\r') {
+                        // \r 语义分两种：
+                        // ① \r\n（Windows/标准换行）→ 等价于换行，不能清空已积累的行内容
+                        // ② 单独 \r（进度条 `printf "\r%d%%"`）→ 回到行首覆盖重写
+                        // 这里先做「延迟判定」：置 pendingCr，真正的清空动作推迟到
+                        // 看下一个字符是不是 '\n'。若下一个是 '\n' 走 ①，否则走 ②。
+                        if (i + 1 < decoded.length()) {
+                            if (decoded.charAt(i + 1) == '\n') {
+                                // \r\n：当普通换行处理，保留内容
+                                pendingCr = false;
+                                i++;
+                                continue;
+                            }
+                            // 单独 \r：回到行首，清空当前行缓冲
+                            if (partial.length() > 0) {
+                                partial.setLength(0);
+                            }
+                        }
+                        // 跨块的情况：本块末尾的 \r，标记 pendingCr，下块开头判定
                         pendingCr = true;
                         i++;
                         continue;
