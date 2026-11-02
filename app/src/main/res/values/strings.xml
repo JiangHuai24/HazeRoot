@@ -103,6 +103,7 @@
 大小：%4$s
 所在目录：%5$s"</string>
     <string name="detail_path">完整名称与路径</string>
+    <string name="already_in_queue">该脚本已在队列中</string>
     <string name="detail_type_dir">文件夹</string>
     <string name="detail_type_elf">ELF 二进制</string>
     <string name="detail_type_file">文件</string>

@@ -112,6 +112,27 @@ public final class Engine {
         return presets;
     }
 
+    /**
+     * 唯一入队入口（架构文档「QueueRepository.enqueue()」的落地）。
+     *
+     * 修复（R3+R1）：原先 3 处入队点各自直接 getScripts().add(...)，无去重、无统一反馈，
+     * 表现为「加乱了」——同一脚本被反复添加。
+     *
+     * @return true=添加成功；false=该路径已在队列中（调用方据此提示「已在队列中」）
+     */
+    public final boolean enqueue(String name, String path) {
+        if (path == null || path.length() == 0) {
+            return false;
+        }
+        for (ScriptItem existing : scripts) {
+            if (path.equals(existing.getPath())) {
+                return false;                  // 已存在，去重
+            }
+        }
+        scripts.add(new ScriptItem(name, path, null, false, false, null, 60, null));
+        return true;
+    }
+
     public final boolean getRunningNow() {
         return runningNow;
     }

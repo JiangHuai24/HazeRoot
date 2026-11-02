@@ -732,20 +732,21 @@ public final class QueueFragment extends Fragment {
 
     public final void addScriptByPath(String path) {
         Intrinsics.checkNotNullParameter(path, "path");
-        ScriptAdapter scriptAdapter = null;
         String n = Kt.substringAfterLast(path, '/', (String) null, 2, (Object) null);
-        Engine.INSTANCE.getScripts().add(new ScriptItem(n, path, null, false, false, null, 60, null));
+        // 修复（R3+R1）：走唯一入队入口，带去重 + 统一反馈
+        boolean added = Engine.INSTANCE.enqueue(n, path);
+        if (!added) {
+            toast(getString(R.string.already_in_queue));
+            return;
+        }
         Store store = Store.INSTANCE;
         Context requireContext = requireContext();
         Intrinsics.checkNotNullExpressionValue(requireContext, "requireContext(...)");
         store.saveScripts(requireContext, Engine.INSTANCE.getScripts());
         ScriptAdapter scriptAdapter2 = this.adapter;
-        if (scriptAdapter2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("adapter");
-        } else {
-            scriptAdapter = scriptAdapter2;
+        if (scriptAdapter2 != null) {
+            scriptAdapter2.notifyDataSetChanged();
         }
-        scriptAdapter.notifyDataSetChanged();
         String string = getString(R.string.enqueued_fmt, n);
         Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
         toast(string);
@@ -1527,7 +1528,12 @@ public final class QueueFragment extends Fragment {
             obj = Kt.substringAfterLast(p, '/', (String) null, 2, (Object) null);
         }
         String n = obj;
-        Engine.INSTANCE.getScripts().add(new ScriptItem(n, p, null, false, false, null, 60, null));
+        // 修复（R3+R1）：走唯一入队入口（去重 + 统一反馈）
+        boolean added = Engine.INSTANCE.enqueue(n, p);
+        if (!added) {
+            this$0.toast(this$0.getString(R.string.already_in_queue));
+            return;
+        }
         Store store = Store.INSTANCE;
         Context requireContext = this$0.requireContext();
         Intrinsics.checkNotNullExpressionValue(requireContext, "requireContext(...)");

@@ -2143,6 +2143,9 @@ public final class FilesFragment extends Fragment {
         Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
         this$0.toast(string);
         act.queueFragment().tryStartDirect(e.getPath());
+        // 修复（R1+R2）：文件页点「执行」后自动切到队列/终端页，
+        // 否则用户看不到输出与进度（原实现只 toast，停留在文件页）。
+        act.switchTo(R.id.navQueue);
     }
 
     /* JADX INFO: Access modifiers changed from: private */
