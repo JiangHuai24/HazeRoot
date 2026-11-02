@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 品牌徽标：黑底 + 淡色描边，使方块在深色背景上也能看见轮廓 -->
+<!--
+  品牌徽标背景。
+  ★ 按用户反馈去掉"灰框感"：原先黑底 + 白色描边形成一块贴片，
+   像硬贴上去的灰色方块。现在改为完全透明 —— 只留图标本身，
+    与页面背景融为一体。
+-->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#ff0b0b0b" />
-    <corners android:radius="9.0dip" />
-    <stroke android:width="1.0dip" android:color="#33FFFFFF" />
+    <solid android:color="#00000000" />
 </shape>

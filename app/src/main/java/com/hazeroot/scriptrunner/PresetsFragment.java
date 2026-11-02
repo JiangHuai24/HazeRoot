@@ -322,6 +322,18 @@ public final class PresetsFragment extends Fragment {
 
     private final void showPresetSheet(int i, final Preset p) {
         final BottomSheetDialog sheet = new BottomSheetDialog(requireContext());
+        // ★ 与队列页 addFlow 同款修复：BottomSheetDialog 内置的 design_bottom_sheet
+        //   容器自带浅色圆角背景，与 bg_sheet 的上圆角叠加 → 顶部两角露白。
+        //   把系统容器与窗口背景都设透明，只留 bg_sheet 自己的形状。
+        sheet.setOnShowListener(dlg -> {
+            if (dlg instanceof BottomSheetDialog) {
+                View bsView = ((BottomSheetDialog) dlg)
+                        .findViewById(com.google.android.material.R.id.design_bottom_sheet);
+                if (bsView != null) {
+                    bsView.setBackgroundResource(android.R.color.transparent);
+                }
+            }
+        });
         LinearLayout box = new LinearLayout(requireContext());
         int i2 = 1;
         box.setOrientation(1);

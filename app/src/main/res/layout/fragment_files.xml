@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout android:orientation="vertical" android:background="@color/bg_page" android:layout_width="fill_parent" android:layout_height="fill_parent"
   xmlns:android="http://schemas.android.com/apk/res/android">
-    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="4.0dip" android:paddingTop="8.0dip" android:paddingRight="12.0dip" android:paddingBottom="4.0dip" android:layout_width="fill_parent" android:layout_height="52.0dip">
-        <!-- 文件页隐藏了底部导航，用左上角「‹」返回队列页 -->
-        <TextView android:textSize="22.0sp" android:textColor="@color/label" android:gravity="center" android:id="@id/btnFilesBack" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="44.0dip" android:layout_height="44.0dip" android:text="‹" />
-        <TextView android:textSize="19.0sp" android:textStyle="bold" android:textColor="@color/label" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_marginLeft="4.0dip" android:text="@string/files_title" android:layout_weight="1.0" />
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="4.0dip" android:paddingTop="8.0dip" android:paddingRight="6.0dip" android:paddingBottom="4.0dip" android:layout_width="fill_parent" android:layout_height="52.0dip">
+        <!-- ☰ 主菜单：导航（回队列页/终端/首页）+ 窗口 + 位置 + 显示
+             文件页隐藏了底部导航，它是唯一出口，第一项必须是「回队列页」 -->
+        <TextView android:textSize="18.0sp" android:textColor="@color/label" android:gravity="center" android:id="@id/btnFilesBack" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="44.0dip" android:layout_height="44.0dip" android:text="☰" />
+        <TextView android:textSize="18.0sp" android:textStyle="bold" android:textColor="@color/label" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_marginLeft="6.0dip" android:text="@string/files_title" android:layout_weight="1.0" />
         <TextView android:textSize="20.0sp" android:textColor="@color/accent" android:gravity="center" android:id="@id/btnNew" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="40.0dip" android:layout_height="40.0dip" android:text="＋" />
+        <!-- ⋮ 列表配置：排序 / 显示隐藏 / 只显示脚本 / 刷新 -->
+        <TextView android:textSize="18.0sp" android:textColor="@color/label" android:gravity="center" android:id="@id/btnOverflow" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="40.0dip" android:layout_height="40.0dip" android:text="⋮" />
     </LinearLayout>
     <HorizontalScrollView android:paddingLeft="16.0dip" android:paddingTop="8.0dip" android:paddingBottom="4.0dip" android:scrollbars="none" android:layout_width="fill_parent" android:layout_height="wrap_content">
         <LinearLayout android:orientation="horizontal" android:id="@id/quickRow" android:layout_width="wrap_content" android:layout_height="32.0dip" />
@@ -43,5 +46,25 @@
             </LinearLayout>
             <com.hazeroot.scriptrunner.FilesListView android:id="@id/listB" android:layout_width="fill_parent" android:layout_height="0.0dip" android:divider="@null" android:dividerHeight="0.0dip" android:layout_weight="1.0" />
         </LinearLayout>
+    </LinearLayout>
+
+    <!-- ===== 底部 5 图标工具栏（MT 风格）===== -->
+    <View android:background="@color/divider" android:layout_width="fill_parent" android:layout_height="1.0px" />
+    <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="48.0dip">
+
+        <!-- ‹ 后退（目录历史） -->
+        <TextView android:textSize="19.0sp" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnNavBack" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="match_parent" android:layout_weight="1.0" android:text="‹" />
+
+        <!-- › 前进（目录历史） -->
+        <TextView android:textSize="19.0sp" android:textColor="@color/label_tertiary" android:gravity="center" android:id="@id/btnNavForward" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="match_parent" android:layout_weight="1.0" android:text="›" />
+
+        <!-- ＋ 新建（已在顶栏有入口，这里保留冗余设计） -->
+        <TextView android:textSize="21.0sp" android:textColor="@color/accent" android:gravity="center" android:id="@id/btnNavNew" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="match_parent" android:layout_weight="1.0" android:text="＋" />
+
+        <!-- ⬅ 回上级目录 -->
+        <TextView android:textSize="18.0sp" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnNavUp" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="match_parent" android:layout_weight="1.0" android:text="⬅" />
+
+        <!-- ↑ 改为「加入队列」——把选中的 .sh 直接加进执行队列（HazeRoot 的产品定位） -->
+        <TextView android:textSize="17.0sp" android:textColor="@color/accent" android:gravity="center" android:id="@id/btnNavEnqueue" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="match_parent" android:layout_weight="1.0" android:text="↑" />
     </LinearLayout>
 </LinearLayout>

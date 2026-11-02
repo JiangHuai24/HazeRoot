@@ -13,7 +13,7 @@
 
     <!-- ===== 顶栏 ===== -->
     <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="16.0dip" android:paddingTop="10.0dip" android:paddingRight="6.0dip" android:paddingBottom="6.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content">
-        <ImageView android:background="@drawable/bg_brand" android:padding="3.0dip" android:layout_width="26.0dip" android:layout_height="26.0dip" android:src="@drawable/ic_brand_h" android:contentDescription="HazeRoot" />
+        <ImageView android:background="@drawable/bg_brand" android:padding="3.0dip" android:layout_width="26.0dip" android:layout_height="26.0dip" android:src="@drawable/ic_brand_h" android:contentDescription="HRT" />
         <TextView android:textSize="20.0sp" android:textStyle="bold" android:textColor="@color/label" android:id="@id/appTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="8.0dip" android:text="@string/app_name" />
 
         <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/rootBadge" android:background="?selectableItemBackground" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="28.0dip" android:layout_marginLeft="12.0dip">
@@ -59,7 +59,16 @@
 
             <!-- 主操作：执行（跳转到终端页） + 停止 -->
             <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginLeft="16.0dip" android:layout_marginTop="10.0dip" android:layout_marginRight="16.0dip">
-                <Button android:id="@id/btnRun" android:background="@drawable/btn_accent_bg" android:layout_width="0.0dip" android:layout_height="46.0dip" android:text="@string/run_all" android:drawablePadding="8.0dip" android:layout_weight="1.0" style="@style/BtnPrimary" />
+                <!-- ★ 修复：原先 Button 的 drawableLeft（▶）+ 居中文字，
+                     图标被甩到左边缘、文字在中间，两者割裂。
+                     改用 FrameLayout + 内部横向 LinearLayout（图标+文字一起居中），
+                     三角紧贴文字，整体作为一个视觉单元。 -->
+                <FrameLayout android:id="@id/btnRun" android:background="@drawable/btn_accent_bg" android:clickable="true" android:focusable="true" android:layout_width="0.0dip" android:layout_height="46.0dip" android:layout_weight="1.0">
+                    <LinearLayout android:gravity="center" android:orientation="horizontal" android:layout_gravity="center" android:layout_width="wrap_content" android:layout_height="wrap_content">
+                        <ImageView android:id="@id/btnRunIcon" android:layout_width="14.0dip" android:layout_height="14.0dip" android:src="@drawable/ic_play_small" android:contentDescription="@null" />
+                        <TextView android:id="@id/btnRunLabel" android:textSize="15.0sp" android:textStyle="bold" android:textColor="#FFFFFFFF" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="7.0dip" android:text="@string/run_all" />
+                    </LinearLayout>
+                </FrameLayout>
                 <ImageView android:id="@id/btnStop" android:background="@drawable/bg_stop_circle" android:padding="10.0dip" android:layout_width="42.0dip" android:layout_height="42.0dip" android:layout_marginLeft="10.0dip" android:src="@drawable/ic_stop" android:contentDescription="@string/cd_stop" android:alpha="0.35" />
             </LinearLayout>
 

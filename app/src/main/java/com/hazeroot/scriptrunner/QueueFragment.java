@@ -51,7 +51,7 @@ import kotlin.text.StringsKt;
 /* loaded from: classes3.dex */
 public final class QueueFragment extends Fragment {
     ScriptAdapter adapter;
-    private Button btnRun;
+    private View btnRun;
     private ImageView btnStop;
     private TextView countBadge;
     private EditText manualInput;
@@ -145,7 +145,7 @@ public final class QueueFragment extends Fragment {
         this.manualInput = (EditText) v.findViewById(R.id.manualInput);
         View findViewById6 = v.findViewById(R.id.btnRun);
         Intrinsics.checkNotNullExpressionValue(findViewById6, "findViewById(...)");
-        this.btnRun = (Button) findViewById6;
+        this.btnRun = findViewById6;
         this.btnStop = (ImageView) v.findViewById(R.id.btnStop);
         View findViewById8 = v.findViewById(R.id.rootBadge);
         Intrinsics.checkNotNullExpressionValue(findViewById8, "findViewById(...)");
@@ -316,7 +316,7 @@ public final class QueueFragment extends Fragment {
                 }
             });
         }
-        Button button = this.btnRun;
+        View button = this.btnRun;
         if (button == null) {
             Intrinsics.throwUninitializedPropertyAccessException("btnRun");
             button = null;
@@ -716,6 +716,20 @@ public final class QueueFragment extends Fragment {
 
     private final void addFlow() {
         final BottomSheetDialog sheet = new BottomSheetDialog(requireContext());
+        // ★ 修复「底部弹窗顶部两个角是白色」：
+        //   BottomSheetDialog 内部的 design_bottom_sheet 容器自带默认背景（浅色圆角矩形），
+        //   它与我们 bg_sheet 的上圆角叠在一起，圆角外侧就露出白色两角。
+        //   这里把系统容器与窗口背景都设为透明，只保留 bg_sheet 自己的形状。
+        sheet.getWindow();
+        sheet.setOnShowListener(dlg -> {
+            if (dlg instanceof BottomSheetDialog) {
+                View bsView = ((BottomSheetDialog) dlg)
+                        .findViewById(com.google.android.material.R.id.design_bottom_sheet);
+                if (bsView != null) {
+                    bsView.setBackgroundResource(android.R.color.transparent);
+                }
+            }
+        });
         LinearLayout box = new LinearLayout(requireContext());
         box.setOrientation(1);
         box.setBackgroundResource(R.drawable.bg_sheet);
@@ -788,6 +802,10 @@ public final class QueueFragment extends Fragment {
             i = 16;
         }
         sheet.setContentView(box);
+        if (sheet.getWindow() != null) {
+            sheet.getWindow().setBackgroundDrawable(
+                    new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
         sheet.show();
     }
 
@@ -1093,13 +1111,13 @@ public final class QueueFragment extends Fragment {
         }
         String string;
         String string2;
-        Button button = this.btnRun;
+        View button = this.btnRun;
         ImageView imageView = null;
         if (button == null) {
             return;
         }
         button.setEnabled(!Engine.INSTANCE.getRunningNow());
-        Button button2 = this.btnRun;
+        View button2 = this.btnRun;
         if (button2 == null) {
             Intrinsics.throwUninitializedPropertyAccessException("btnRun");
             button2 = null;
@@ -1135,19 +1153,22 @@ public final class QueueFragment extends Fragment {
         } else {
             string = getString(R.string.run_all);
         }
-        button2.setText(string);
-        Button button3 = this.btnRun;
-        if (button3 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("btnRun");
-            button3 = null;
+        // ★ btnRun 现在是 FrameLayout（内部 图标+文字 整体居中），
+        //   文字更新要走内部的 TextView，不能再对容器 setText/setCompoundDrawables。
+        View runLabelV = this.btnRun.findViewById(R.id.btnRunLabel);
+        if (runLabelV instanceof TextView) {
+            ((TextView) runLabelV).setText(string);
         }
-        button3.setCompoundDrawablesRelativeWithIntrinsicBounds(Engine.INSTANCE.getRunningNow() ? 0 : R.drawable.ic_play, 0, 0, 0);
-        Button button4 = this.btnRun;
+        // 三角图标显隐：运行时隐藏（避免"播放中"的误导）
+        View runIconV = this.btnRun.findViewById(R.id.btnRunIcon);
+        if (runIconV != null) {
+            runIconV.setVisibility(Engine.INSTANCE.getRunningNow() ? View.GONE : View.VISIBLE);
+        }
+        View button4 = this.btnRun;
         if (button4 == null) {
             Intrinsics.throwUninitializedPropertyAccessException("btnRun");
             button4 = null;
         }
-        button4.setCompoundDrawablePadding(dp(8));
         ImageView imageView2 = this.btnStop;
         if (imageView2 == null) {
             Intrinsics.throwUninitializedPropertyAccessException("btnStop");

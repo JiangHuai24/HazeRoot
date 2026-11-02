@@ -54,7 +54,7 @@ public final class HomeFragment extends Fragment {
         tlp.leftMargin = dp(10);
         brandRow.addView(titleBox, tlp);
 
-        TextView title = text("HazeRoot", 22, true, R.color.label);
+        TextView title = text("HRT", 22, true, R.color.label);
         titleBox.addView(title);
         TextView ver = text("v" + BuildConfigVersion(), 11, false, R.color.label_tertiary);
         titleBox.addView(ver);
@@ -107,7 +107,7 @@ public final class HomeFragment extends Fragment {
 
         // ===== 作者与更新 =====
         root.addView(sectionTitle("关于"));
-        TextView author = text("作者  HazeRoot\n开源  github.com/JiangHuai24/HazeRoot\n许可  MIT", 12, false, R.color.label_secondary);
+        TextView author = text("作者  HRT\n开源  github.com/JiangHuai24/HazeRoot\n许可  MIT", 12, false, R.color.label_secondary);
         author.setLineSpacing(dp(4), 1f);
         addBlock(root, author, 10);
 

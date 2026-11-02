@@ -221,16 +221,20 @@ public final class FilesFragment extends Fragment {
         Intrinsics.checkNotNullExpressionValue(findViewById4, "findViewById(...)");
         this.btnNew = findViewById4;
 
-        // 左上角返回：文件页隐藏了底部导航，靠它回队列页
+        // ☰ 主菜单：导航出口（底部导航隐藏后唯一出口）+ 窗口 + 位置 + 显示
         View backV = v.findViewById(R.id.btnFilesBack);
         if (backV != null) {
-            backV.setOnClickListener(view2 -> {
-                android.app.Activity act = getActivity();
-                if (act instanceof MainActivity) {
-                    ((MainActivity) act).switchTo(R.id.navQueue);
-                }
-            });
+            backV.setOnClickListener(view2 -> showFileMainMenu());
         }
+        // ⋮ 列表配置菜单
+        View ovV = v.findViewById(R.id.btnOverflow);
+        if (ovV != null) {
+            ovV.setOnClickListener(view2 -> showFileOptionsMenu());
+        }
+        // 读取显示偏好（显示隐藏文件 / 只显示脚本 / 排序方式）
+        loadFilePrefs();
+        // 底部 5 图标工具栏：‹ › ＋ ⬅ ↑(加入队列)
+        bindBottomToolbar(v);
         List<Pane> list = this.panes;
         View findViewById5 = v.findViewById(R.id.btnUpA);
         Intrinsics.checkNotNullExpressionValue(findViewById5, "findViewById(...)");
@@ -488,21 +492,29 @@ public final class FilesFragment extends Fragment {
 
     /* JADX INFO: Access modifiers changed from: private */
     public final void restylePanes() {
-        // 修复（R3 A 级痛点）：原先「当前窗」的高亮只落在 30dp 的路径栏背景上，
-        // 占屏 90% 的列表区两窗完全一样，用户无法一眼判断「我在操作哪一边」。
-        // 现在给当前窗的整列容器加一层很淡的 accent 底色，非当前窗保持透明。
+        // ★ 按用户反馈重做「当前窗」标识：
+        //   原先两层蓝色叠加（整列 bg_pane_active 淡蓝底 + 路径 bg_pick_hint 蓝底），
+        //   肉眼观感是"一片诡异蓝块"。
+        //   现在：①整列底色一律去掉（不染列表）②路径框保持同一中性底
+        //        ③只把当前窗的路径文字染成 accent 色 —— 用文字色分区，不用色块分区。
         View paneA = getView() != null ? getView().findViewById(R.id.paneA) : null;
         View paneB = getView() != null ? getView().findViewById(R.id.paneB) : null;
         if (paneA != null) {
-            paneA.setBackgroundResource(this.activeIdx == 0 ? R.drawable.bg_pane_active : 0);
+            paneA.setBackgroundResource(0);
         }
         if (paneB != null) {
-            paneB.setBackgroundResource(this.activeIdx == 1 ? R.drawable.bg_pane_active : 0);
+            paneB.setBackgroundResource(0);
         }
-        Iterable $this$forEach$iv = this.panes;
-        for (Object element$iv : $this$forEach$iv) {
-            Pane p = (Pane) element$iv;
-            p.getPathView().setBackgroundResource(this.panes.indexOf(p) == this.activeIdx ? R.drawable.bg_pick_hint : R.drawable.bg_quick_chip);
+        int accent = colorOf(R.color.accent);
+        int dim = colorOf(R.color.label_secondary);
+        for (Pane p : panes) {
+            TextView pv = p.getPathView();
+            if (pv == null) {
+                continue;
+            }
+            // 两窗用同一种中性底，避免"一边蓝一边灰"的割裂感
+            pv.setBackgroundResource(R.drawable.bg_quick_chip);
+            pv.setTextColor(panes.indexOf(p) == activeIdx ? accent : dim);
         }
         refreshQuickSelection();
     }
@@ -840,6 +852,581 @@ public final class FilesFragment extends Fragment {
         }
     }
 
+    // ==================== 文件页菜单（☰ / ⋮）====================
+
+    private static final String K_RECENT = "recent_dirs";
+    private static final int RECENT_MAX = 5;
+    private static final String K_SHOW_HIDDEN = "show_hidden";
+    private static final String K_ONLY_SCRIPT = "only_script";
+    private static final String K_SORT_MODE = "sort_mode";
+
+    /** 只显示 .sh 脚本（HazeRoot 是脚本执行器，找脚本是文件页主要目的） */
+    private boolean onlyScripts;
+    /** 是否显示点开头文件。默认 true —— 现有 ls -Al 本来就列点文件，默认关闭会改变现有行为 */
+    private boolean showHidden = true;
+    /** 排序：name / size */
+    private String sortMode = "name";
+
+    private void loadFilePrefs() {
+        try {
+            android.content.SharedPreferences p = homePrefs();
+            showHidden = p.getBoolean(K_SHOW_HIDDEN, true);
+            onlyScripts = p.getBoolean(K_ONLY_SCRIPT, false);
+            sortMode = p.getString(K_SORT_MODE, "name");
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void saveFilePref(String key, boolean v) {
+        try {
+            homePrefs().edit().putBoolean(key, v).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    /**
+     * ☰ 主菜单。
+     * 第一项必须是「回队列页」—— 文件页隐藏了底部导航，这是唯一出口。
+     */
+    private void showFileMainMenu() {
+        if (getView() == null) {
+            return;
+        }
+        final Pane p = activePane();
+        String cur = (p != null) ? p.getDir() : "/";
+        List<GItem> items = new ArrayList<>();
+
+        // ---- 导航（必须放最前）----
+        items.add(new GItem("回队列页", false, () -> {
+            android.app.Activity act = getActivity();
+            if (act instanceof MainActivity) {
+                ((MainActivity) act).switchTo(R.id.navQueue);
+            }
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem("去终端", false, () -> {
+            android.app.Activity act = getActivity();
+            if (act instanceof MainActivity) {
+                ((MainActivity) act).switchTo(R.id.navTerminal);
+            }
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem("去首页", false, () -> {
+            android.app.Activity act = getActivity();
+            if (act instanceof MainActivity) {
+                ((MainActivity) act).switchTo(R.id.navHome);
+            }
+            return Unit.INSTANCE;
+        }));
+
+        // ---- 窗口 ----
+        items.add(new GItem("左窗的目录在右窗打开", false, () -> {
+            Pane a = panes.get(0);
+            Pane b = panes.get(1);
+            b.load(a.getDir(), 0);
+            b.setActive();
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem("交换左右窗", false, () -> {
+            Pane a = panes.get(0);
+            Pane b = panes.get(1);
+            String da = a.getDir();
+            String db = b.getDir();
+            a.load(db, 0);
+            b.load(da, 0);
+            return Unit.INSTANCE;
+        }));
+
+        // ---- 位置 ----
+        items.add(new GItem("最近访问 ›", false, () -> {
+            showRecentDirsMenu();
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem("书签 ›", false, () -> {
+            showBookmarkMenu();
+            return Unit.INSTANCE;
+        }));
+
+        // ---- 显示 ----
+        items.add(new GItem(showHidden ? "显示隐藏文件 ✓" : "显示隐藏文件", false, () -> {
+            showHidden = !showHidden;
+            saveFilePref(K_SHOW_HIDDEN, showHidden);
+            refreshAllLists();
+            toast(showHidden ? "已显示隐藏文件" : "已隐藏点文件");
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem(onlyScripts ? "只显示脚本 .sh ✓" : "只显示脚本 .sh", false, () -> {
+            onlyScripts = !onlyScripts;
+            saveFilePref(K_ONLY_SCRIPT, onlyScripts);
+            refreshAllLists();
+            toast(onlyScripts ? "只显示 .sh 脚本" : "显示全部文件");
+            return Unit.INSTANCE;
+        }));
+
+        listMenuAt("文件", null, items, getView().findViewById(R.id.btnFilesBack));
+    }
+
+    /** ⋮ 列表配置菜单：排序 / 刷新 / 目录统计 */
+    private void showFileOptionsMenu() {
+        if (getView() == null) {
+            return;
+        }
+        final Pane p = activePane();
+        if (p == null) {
+            return;
+        }
+        List<GItem> items = new ArrayList<>();
+        items.add(new GItem(sortMode.equals("name") ? "按名称 ✓" : "按名称", false, () -> {
+            sortMode = "name";
+            try {
+                homePrefs().edit().putString(K_SORT_MODE, "name").apply();
+            } catch (Exception ignored) {
+            }
+            refreshAllLists();
+            toast("已按名称排序");
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem(sortMode.equals("size") ? "按大小 ✓" : "按大小", false, () -> {
+            sortMode = "size";
+            try {
+                homePrefs().edit().putString(K_SORT_MODE, "size").apply();
+            } catch (Exception ignored) {
+            }
+            refreshAllLists();
+            toast("已按大小排序");
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem("刷新", false, () -> {
+            Pane.load$default(p, p.getDir(), 0, 2, null);
+            return Unit.INSTANCE;
+        }));
+
+        int dirs = 0;
+        int files = 0;
+        for (FsEntry e : p.getEntries()) {
+            if (e == null) {
+                continue;
+            }
+            if (e.getIsDir()) {
+                dirs++;
+            } else {
+                files++;
+            }
+        }
+        items.add(new GItem("文件夹 " + dirs + " · 文件 " + files, false, () -> Unit.INSTANCE));
+
+        listMenuAt("列表显示", p.getDir(), items, getView().findViewById(R.id.btnOverflow));
+    }
+
+    /** 最近访问子菜单 */
+    private void showRecentDirsMenu() {
+        List<GItem> items = new ArrayList<>();
+        for (final String d : recentDirs()) {
+            items.add(new GItem(d, false, () -> {
+                jumpToDir(d);
+                return Unit.INSTANCE;
+            }));
+        }
+        if (items.isEmpty()) {
+            items.add(new GItem("暂无记录", true, () -> Unit.INSTANCE));
+        } else {
+            items.add(new GItem("清空记录", true, () -> {
+                try {
+                    homePrefs().edit().remove(K_RECENT).apply();
+                } catch (Exception ignored) {
+                }
+                toast("已清空");
+                return Unit.INSTANCE;
+            }));
+        }
+        listMenuAt("最近访问", null, items, getView().findViewById(R.id.btnFilesBack));
+    }
+
+    /** 书签子菜单 */
+    private void showBookmarkMenu() {
+        List<GItem> items = new ArrayList<>();
+        for (final String entry : bookmarkEntries()) {
+            String[] kv = entry.split("\u0001", 2);
+            final String path = kv.length > 1 ? kv[1] : kv[0];
+            String name = kv.length > 1 ? kv[0] : entry;
+            items.add(new GItem(name + "  " + path, false, () -> {
+                jumpToDir(path);
+                return Unit.INSTANCE;
+            }));
+        }
+        Pane p = activePane();
+        final String cur = (p != null) ? p.getDir() : "/";
+        items.add(new GItem("＋ 添加当前目录为书签", false, () -> {
+            addBookmark(cur);
+            return Unit.INSTANCE;
+        }));
+        listMenuAt("书签", null, items, getView().findViewById(R.id.btnFilesBack));
+    }
+
+    /** 跳转到目录（对当前活动窗生效） */
+    private void jumpToDir(String dir) {
+        if (dir == null || dir.length() == 0 || getView() == null) {
+            return;
+        }
+        Pane p = activePane();
+        if (p != null) {
+            p.load(dir, 0);
+        }
+    }
+
+    // ==================== 目录历史（后退 / 前进）====================
+    // Pane 本身没有历史栈，这里在 Fragment 侧按窗索引维护，不改动 Pane 内部结构。
+    private final java.util.List<java.util.List<String>> navHistory = new ArrayList<>();
+    private final int[] navCursor = new int[]{-1, -1};
+
+    private void ensureNavHistory() {
+        while (navHistory.size() < panes.size()) {
+            navHistory.add(new ArrayList<>());
+        }
+    }
+
+    /** 记录一次目录访问（由 load 成功回调调用，保证只记真实存在的目录） */
+    void recordNav(String dir, int paneIdx) {
+        ensureNavHistory();
+        if (paneIdx < 0 || paneIdx >= navHistory.size()) {
+            return;
+        }
+        java.util.List<String> h = navHistory.get(paneIdx);
+        if (navCursor[paneIdx] >= 0 && navCursor[paneIdx] < h.size()
+                && Intrinsics.areEqual(h.get(navCursor[paneIdx]), dir)) {
+            return;
+        }
+        // 截断前进分支后再插入
+        while (h.size() > navCursor[paneIdx] + 1) {
+            h.remove(h.size() - 1);
+        }
+        h.add(dir);
+        navCursor[paneIdx] = h.size() - 1;
+    }
+
+    private boolean navCanBack(int idx) {
+        ensureNavHistory();
+        return idx >= 0 && idx < navCursor.length && navCursor[idx] > 0;
+    }
+
+    private boolean navCanForward(int idx) {
+        ensureNavHistory();
+        return idx >= 0 && idx < navHistory.size()
+                && navCursor[idx] < navHistory.get(idx).size() - 1;
+    }
+
+    private void navBack(int idx) {
+        ensureNavHistory();
+        if (!navCanBack(idx)) {
+            return;
+        }
+        navCursor[idx]--;
+        Pane p = panes.get(idx);
+        p.load(navHistory.get(idx).get(navCursor[idx]), 0);
+    }
+
+    private void navForward(int idx) {
+        ensureNavHistory();
+        if (!navCanForward(idx)) {
+            return;
+        }
+        navCursor[idx]++;
+        Pane p = panes.get(idx);
+        p.load(navHistory.get(idx).get(navCursor[idx]), 0);
+    }
+
+    /** 底部工具栏 5 图标绑定 */
+    private void bindBottomToolbar(View v) {
+        View b = v.findViewById(R.id.btnNavBack);
+        if (b != null) {
+            b.setOnClickListener(x -> {
+                int idx = activePaneIdx();
+                navBack(idx);
+            });
+        }
+        b = v.findViewById(R.id.btnNavForward);
+        if (b != null) {
+            b.setOnClickListener(x -> {
+                int idx = activePaneIdx();
+                navForward(idx);
+            });
+        }
+        b = v.findViewById(R.id.btnNavNew);
+        if (b != null) {
+            b.setOnClickListener(x -> { View nb = btnNew; if (nb != null) nb.performClick(); });
+        }
+        b = v.findViewById(R.id.btnNavUp);
+        if (b != null) {
+            b.setOnClickListener(x -> {
+                Pane p = activePane();
+                if (p != null) {
+                    p.up();
+                }
+            });
+        }
+        b = v.findViewById(R.id.btnNavEnqueue);
+        if (b != null) {
+            b.setOnClickListener(x -> enqueueSelectedOrCurrent());
+        }
+    }
+
+    private int activePaneIdx() {
+        if (selPane != null) {
+            int i = panes.indexOf(selPane);
+            if (i >= 0) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 「加入队列」：把多选中的 .sh 加进执行队列；
+     * 未在多选态时，把当前活动窗里「点选过」的脚本加入队列。
+     * 这是文件页 → 队列页的快捷闭环。
+     */
+    private void enqueueSelectedOrCurrent() {
+        java.util.List<String> targets = new ArrayList<>();
+        for (String p : selected) {
+            if (p != null && p.toLowerCase(java.util.Locale.ROOT).endsWith(".sh")) {
+                targets.add(p);
+            }
+        }
+        if (targets.isEmpty()) {
+            toast("请先左滑选中 .sh 脚本");
+            return;
+        }
+        int n = 0;
+        for (String p : targets) {
+            try {
+                enqueue(p);
+                n++;
+            } catch (Exception ignored) {
+            }
+        }
+        toast("已加入队列 " + n + " 个脚本");
+        exitMulti();
+    }
+
+    /**
+     * 让「显示隐藏文件 / 只显示脚本 / 排序」立刻生效。
+     * 走 load() 重新读一次目录 —— 排序与过滤都作用在 load 成功回调里，
+     * 这样不必改动 adapter 的私有字段（JADX 产物里 rows 是匿名类 final 字段，外部不可达）。
+     * 代价是一次 ls，但只在用户手动切换开关时发生。
+     */
+    private void refreshAllLists() {
+        for (Pane p : panes) {
+            if (p != null) {
+                Pane.load$default(p, p.getDir(), 0, 2, null);
+            }
+        }
+    }
+
+    private Pane activePane() {
+        if (panes.isEmpty()) {
+            return null;
+        }
+        if (selPane != null) {
+            return selPane;
+        }
+        return panes.get(0);
+    }
+
+    // ---- 最近访问持久化 ----
+    private List<String> recentDirs() {
+        List<String> out = new ArrayList<>();
+        try {
+            String raw = homePrefs().getString(K_RECENT, "");
+            if (raw != null && raw.length() > 0) {
+                for (String s : raw.split("\n")) {
+                    if (s.length() > 0) {
+                        out.add(s);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    /**
+     * 记录访问过的目录。
+     * 只在「读取成功」后调用；顶条相同则直接 return，
+     * 保证同目录反复刷新（项目里 16 处 Pane.load$default）零写盘。
+     */
+    void rememberDir(String dir) {
+        if (dir == null || dir.length() == 0) {
+            return;
+        }
+        List<String> list = recentDirs();
+        if (!list.isEmpty() && Intrinsics.areEqual(list.get(0), dir)) {
+            return;
+        }
+        list.remove(dir);
+        list.add(0, dir);
+        while (list.size() > RECENT_MAX) {
+            list.remove(list.size() - 1);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String s : list) {
+            if (sb.length() > 0) {
+                sb.append('\n');
+            }
+            sb.append(s);
+        }
+        try {
+            homePrefs().edit().putString(K_RECENT, sb.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    // ---- 书签持久化（名称\u0001路径，换行分隔）----
+    private List<String> bookmarkEntries() {
+        List<String> out = new ArrayList<>();
+        try {
+            String raw = homePrefs().getString("bookmarks", "");
+            if (raw != null && raw.length() > 0) {
+                for (String s : raw.split("\n")) {
+                    if (s.length() > 0) {
+                        out.add(s);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    private void addBookmark(String path) {
+        if (path == null || path.length() == 0) {
+            return;
+        }
+        List<String> list = bookmarkEntries();
+        for (String s : list) {
+            if (s.endsWith("\u0001" + path)) {
+                toast("该书签已存在");
+                return;
+            }
+        }
+        String name = Kt.substringAfterLast(path, "/", (String) null, 2, (Object) null);
+        if (name == null || name.length() == 0) {
+            name = path;
+        }
+        list.add(name + "\u0001" + path);
+        StringBuilder sb = new StringBuilder();
+        for (String s : list) {
+            if (sb.length() > 0) {
+                sb.append('\n');
+            }
+            sb.append(s);
+        }
+        try {
+            homePrefs().edit().putString("bookmarks", sb.toString()).apply();
+        } catch (Exception ignored) {
+        }
+        toast("已添加书签");
+    }
+
+    /**
+     * 点脚本时的操作选择框（MT 录屏 1:1 复刻）。
+     *
+     * 布局：
+     *   ┌──────────────────────────────┐
+     *   │ LinYuDriverLoader.sh         │  标题 = 文件名
+     *   │ 请选择要执行的操作             │
+     *   │                               │
+     *   │          设置   编辑   执行    │  右下横排文字按钮
+     *   └──────────────────────────────┘
+     */
+    private void showScriptActionPicker(final FsEntry e, final Pane pane) {
+        if (e == null || getContext() == null) {
+            return;
+        }
+        final android.app.Dialog dlg = new android.app.Dialog(requireContext());
+        dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dlg.setCanceledOnTouchOutside(true);
+
+        LinearLayout box = new LinearLayout(requireContext());
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setBackgroundResource(R.drawable.bg_mt_panel_popup);
+        box.setPadding(dp(20), dp(18), dp(20), dp(10));
+
+        TextView title = new TextView(requireContext());
+        title.setText(e.getName());
+        title.setTextSize(15.0f);
+        title.setTextColor(colorOf(R.color.label));
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        title.setSingleLine(true);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+        box.addView(title, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView desc = new TextView(requireContext());
+        desc.setText("请选择要执行的操作");
+        desc.setTextSize(12.5f);
+        desc.setTextColor(colorOf(R.color.label_secondary));
+        desc.setPadding(0, dp(6), 0, dp(16));
+        box.addView(desc, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout acts = new LinearLayout(requireContext());
+        acts.setOrientation(LinearLayout.HORIZONTAL);
+        acts.setGravity(android.view.Gravity.END);
+
+        String[] labels = {"设置", "编辑", "执行"};
+        int[] colors = {R.color.label_secondary, R.color.label_secondary, R.color.accent};
+        for (int i = 0; i < labels.length; i++) {
+            final String act = labels[i];
+            TextView btn = new TextView(requireContext());
+            btn.setText(act);
+            btn.setTextSize(13.5f);
+            btn.setTextColor(colorOf(colors[i]));
+            btn.setGravity(android.view.Gravity.CENTER);
+            btn.setPadding(dp(16), dp(8), dp(16), dp(8));
+            btn.setClickable(true);
+            btn.setFocusable(true);
+            android.util.TypedValue tvv = new android.util.TypedValue();
+            requireContext().getTheme().resolveAttribute(
+                    android.R.attr.selectableItemBackgroundBorderless, tvv, true);
+            if (tvv.resourceId != 0) {
+                btn.setBackgroundResource(tvv.resourceId);
+            }
+            btn.setOnClickListener(v -> {
+                dlg.dismiss();
+                switch (act) {
+                    case "设置":
+                        chmodDialog(pane, e);
+                        break;
+                    case "编辑":
+                        openEditor(e);
+                        break;
+                    case "执行":
+                        executeFile(e);
+                        break;
+                    default:
+                        break;
+                }
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            if (i > 0) {
+                lp.leftMargin = dp(10);
+            }
+            acts.addView(btn, lp);
+        }
+        box.addView(acts, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        dlg.setContentView(box);
+        if (dlg.getWindow() != null) {
+            dlg.getWindow().setBackgroundDrawable(
+                    new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            int w = (int) (getResources().getDisplayMetrics().widthPixels * 0.80f);
+            dlg.getWindow().setLayout(w, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dlg.show();
+    }
+
     /** 分发 MT 面板动作到已有能力 */
     private void handleMtAction(String label, FsEntry e, Pane pane) {
         switch (label) {
@@ -1017,6 +1604,8 @@ public final class FilesFragment extends Fragment {
     final class Pane {
         private ArrayAdapter<Pair<String, FsEntry>> adapterRef;
         private String dir;
+        /** 最近一次「读取成功」的目录，用于读取失败时回滚，避免路径栏与列表不一致 */
+        private String lastGoodDir;
         private final Map<String, Boolean> elfMap;
         private List<FsEntry> entries;
         private int gen;
@@ -1190,8 +1779,9 @@ public final class FilesFragment extends Fragment {
                         return;
                     }
                     if (this$1.isScriptFile(e.getName())) {
-                        // 只有 .sh / 无扩展名的可执行文件才走执行
-                        this$1.executeFile(e);
+                        // ★ 按 MT 录屏：点脚本不再直接执行，先弹「设置 / 编辑 / 执行」选择框，
+                        //   避免误触把脚本跑起来（用户之前就踩过执行第三方脚本的问题）。
+                        this$1.showScriptActionPicker(e, this$0);
                         return;
                     }
                     // 其他未知类型：弹「打开方式」而非直接执行
@@ -1427,6 +2017,14 @@ public final class FilesFragment extends Fragment {
             if (this$0.isAdded() && $g == this$1.gen) {
                 if ($error != null) {
                     this$0.toast($error);
+                    // ★ 修复：load() 开头(1322-1324)已把 dir/pathView 改成新路径，
+                    //   但本次读取失败、entries 仍是旧目录内容 → 路径栏与列表不一致。
+                    //   回滚到上一次读取成功的目录，保证 UI 与数据一致。
+                    if (this$1.lastGoodDir != null && this$1.lastGoodDir.length() > 0) {
+                        this$1.dir = this$1.lastGoodDir;
+                        this$1.pathView.setText(this$1.lastGoodDir);
+                        this$0.refreshQuickSelection();
+                    }
                     return;
                 }
                 if (list.size() == 1 && ((FsEntry) list.get(0)).getLinkTarget() != null && $follow < 3) {
@@ -1440,6 +2038,28 @@ public final class FilesFragment extends Fragment {
                         return;
                     }
                 }
+                // ★ 显示过滤：在排序之前做，作用于 entries 层
+                //   ① 显示隐藏文件（默认 true —— 现有 ls -Al 本来就列点文件，默认关闭会改变现有行为）
+                //   ② 只显示 .sh 脚本（HazeRoot 是脚本执行器，找脚本是文件页主要目的）
+                // 注意：list 是裸 List（JADX 产物无泛型），removeIf 需按原始类型遍历删除
+                for (int fi = list.size() - 1; fi >= 0; fi--) {
+                    Object fo = list.get(fi);
+                    if (!(fo instanceof FsEntry)) {
+                        continue;
+                    }
+                    FsEntry fe = (FsEntry) fo;
+                    boolean drop = false;
+                    if (!this$0.showHidden && fe.getName().startsWith(".")) {
+                        drop = true;
+                    }
+                    if (this$0.onlyScripts
+                            && (fe.getIsDir() || !fe.getName().toLowerCase(Locale.ROOT).endsWith(".sh"))) {
+                        drop = true;
+                    }
+                    if (drop) {
+                        list.remove(fi);
+                    }
+                }
                 final Comparator comparator = new Comparator() { // from class: com.hazeroot.scriptrunner.FilesFragment$Pane$load$lambda$10$lambda$9$$inlined$compareByDescending$1
                     /* JADX WARN: Multi-variable type inference failed */
                     @Override // java.util.Comparator
@@ -1450,6 +2070,8 @@ public final class FilesFragment extends Fragment {
                         return ComparisonsKt.compareValues(valueOf, Boolean.valueOf(it2.getIsDir()));
                     }
                 };
+                // ★ 排序：目录优先不变；目录内按用户选择（名称 / 大小）
+                final boolean bySize = "size".equals(this$0.sortMode);
                 CollectionsKt.sortWith(list, new Comparator() { // from class: com.hazeroot.scriptrunner.FilesFragment$Pane$load$lambda$10$lambda$9$$inlined$thenBy$1
                     /* JADX WARN: Multi-variable type inference failed */
                     @Override // java.util.Comparator
@@ -1459,9 +2081,17 @@ public final class FilesFragment extends Fragment {
                             return previousCompare;
                         }
                         FilesFragment.FsEntry it = (FilesFragment.FsEntry) t2;
+                        FilesFragment.FsEntry it2 = (FilesFragment.FsEntry) t3;
+                        if (bySize) {
+                            // 大的在前
+                            long s1 = it.getSize();
+                            long s2 = it2.getSize();
+                            if (s1 != s2) {
+                                return s1 > s2 ? -1 : 1;
+                            }
+                        }
                         String lowerCase = it.getName().toLowerCase(Locale.ROOT);
                         Intrinsics.checkNotNullExpressionValue(lowerCase, "toLowerCase(...)");
-                        FilesFragment.FsEntry it2 = (FilesFragment.FsEntry) t3;
                         String lowerCase2 = it2.getName().toLowerCase(Locale.ROOT);
                         Intrinsics.checkNotNullExpressionValue(lowerCase2, "toLowerCase(...)");
                         return ComparisonsKt.compareValues(lowerCase, lowerCase2);
@@ -1471,6 +2101,13 @@ public final class FilesFragment extends Fragment {
                 this$1.elfMap.clear();
                 this$1.bindList();
                 this$1.probeElves(newDir);
+                // ★ 记录"最近一次读取成功的目录"，供失败跳转回滚用
+                this$1.lastGoodDir = newDir;
+                // ★ 记录到「最近访问」（只在读取成功且非软链跟随结果时记，避免写脏数据）
+                if ($follow == 0) {
+                    this$0.rememberDir(newDir);
+                    this$0.recordNav(newDir, this$1.idx);
+                }
             }
         }
 
@@ -3270,6 +3907,109 @@ public final class FilesFragment extends Fragment {
             Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
             this$0.toast(string);
             Pane.load$default(dstPane, dstPane.getDir(), 0, 2, null);
+        }
+    }
+
+    /**
+     * 竖向列表菜单（用于 ☰ 主菜单 / ⋮ 配置菜单）。
+     *
+     * 与 gridMenu 的区别：
+     *   gridMenu 是「两列胶囊按钮」网格（MT 长按面板用的那种），
+     *   做主菜单时每个按钮独立圆角底 → 视觉上像一堆散落的方块。
+     *   这里用整块面板 + 普通行项目（无独立背景），更像系统菜单。
+     *
+     * @param title   面板顶部标题（null 则隐藏）
+     * @param items   菜单项
+     * @param header  标题下的一行小字说明（null 则隐藏）
+     */
+    private void listMenu(String title, String header, List<GItem> items) {
+        listMenuAt(title, header, items, null);
+    }
+
+    /**
+     * 锚定下拉菜单（☰ / ⋮ 用这个，不是居中弹窗）。
+     *
+     * @param anchor 锚点 View：弹出位置贴着它（☰ 贴左上角，⋮ 贴右上角）
+     */
+    private void listMenuAt(String title, String header, List<GItem> items, View anchor) {
+        if (getView() == null) {
+            return;
+        }
+        Context ctx = requireContext();
+        LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setBackgroundResource(R.drawable.bg_mt_panel);
+        box.setClipToOutline(true);
+        int maxW = (int) (getResources().getDisplayMetrics().widthPixels * 0.62f);
+
+        if (title != null && title.length() > 0) {
+            TextView tv = new TextView(ctx);
+            tv.setText(title);
+            tv.setTextSize(12.5f);
+            tv.setTextColor(colorOf(R.color.label_secondary));
+            tv.setPadding(dp(16), dp(12), dp(16), dp(header != null ? 2 : 8));
+            tv.setSingleLine(true);
+            tv.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+            box.addView(tv, new LinearLayout.LayoutParams(maxW, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+        if (header != null && header.length() > 0) {
+            TextView hv = new TextView(ctx);
+            hv.setText(header);
+            hv.setTextSize(11f);
+            hv.setTextColor(colorOf(R.color.label_tertiary));
+            hv.setPadding(dp(16), 0, dp(16), dp(6));
+            hv.setSingleLine(true);
+            hv.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+            box.addView(hv, new LinearLayout.LayoutParams(maxW, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+        // ★ 修复「顶部弹窗两个角变白」：原先是「透明背景 + setElevation(10)」，
+        //   透明 drawable 画不出阴影，系统在圆角外补一圈白色轮廓 → 看起来像白边两角。
+        //   现在把圆角面板本身作为 PopupWindow 背景（随窗口裁剪），并关掉 elevation。
+        box.setBackgroundResource(0);
+        final android.widget.PopupWindow pw = new android.widget.PopupWindow(
+                box, maxW, ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        pw.setBackgroundDrawable(androidx.core.content.ContextCompat.getDrawable(ctx, R.drawable.bg_mt_panel_popup));
+        pw.setOutsideTouchable(true);
+        pw.setElevation(0f);
+
+        for (GItem item : items) {
+            TextView row = new TextView(ctx);
+            row.setText(item.getLabel());
+            row.setTextSize(14f);
+            row.setTextColor(item.getDanger()
+                    ? colorOf(R.color.error_text) : colorOf(R.color.label));
+            row.setPadding(dp(16), 0, dp(16), 0);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setSingleLine(true);
+            row.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            row.setClickable(true);
+            row.setFocusable(true);
+            android.util.TypedValue tv0 = new android.util.TypedValue();
+            requireContext().getTheme().resolveAttribute(
+                    android.R.attr.selectableItemBackground, tv0, true);
+            if (tv0.resourceId != 0) {
+                row.setBackgroundResource(tv0.resourceId);
+            }
+            final GItem fi = item;
+            row.setOnClickListener(vv -> {
+                pw.dismiss();
+                try {
+                    fi.getAction().invoke();
+                } catch (Exception ignored) {
+                }
+            });
+            box.addView(row, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+        }
+        View spacer = new View(ctx);
+        box.addView(spacer, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(6)));
+
+        if (anchor != null) {
+            // 贴着按钮弹出，向下展开（☰ 左上 / ⋮ 右上）
+            pw.showAsDropDown(anchor, 0, dp(2));
+        } else {
+            pw.showAtLocation(getView(), android.view.Gravity.CENTER, 0, 0);
         }
     }
 

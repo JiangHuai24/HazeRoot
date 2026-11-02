@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  PopupWindow 专用背景：圆角 + 无描边。
+  ★ 作为 PopupWindow 的 backgroundDrawable 使用时，
+    drawable 会作为窗口底色，圆角外自然透明 —— 不会出现白色角。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#FF20242C" />
+    <corners android:radius="13.0dip" />
+</shape>

@@ -384,4 +384,8 @@
     <item type="id" name="btnNavForward" />
     <item type="id" name="btnNavUp" />
     <item type="id" name="btnNavUpload" />
+    <item type="id" name="btnRunIcon" />
+    <item type="id" name="btnRunLabel" />
+    <item type="id" name="btnNavNew" />
+    <item type="id" name="btnNavEnqueue" />
 </resources>

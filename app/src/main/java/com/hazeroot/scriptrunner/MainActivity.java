@@ -55,6 +55,8 @@ public final class MainActivity extends AppCompatActivity {
     private HomeFragment home;
     private TerminalFragment terminal;
     private View navIsland;
+    /** 当前选中的 Tab id，用于让键盘监听尊重「文件页隐藏导航」的规则 */
+    private int currentTabId = R.id.tabQueue;
     private ActivityResultLauncher<String> onboardNotiLauncher;
     private PresetsFragment presets;
     private QueueFragment queue;
@@ -324,9 +326,12 @@ public final class MainActivity extends AppCompatActivity {
         //   但执行脚本后终端内容 + 输入法会让容器变矮，导航被隐藏后再也不会恢复，
         //   导致用户卡在终端页切不出去。底部导航现在是悬浮胶囊、占高很小，
         //   键盘弹起也不会遮挡内容，因此**始终显示**。
+        //   ★ 但文件页例外：它为了多显示两行列表主动隐藏了导航（见 selectTab），
+        //     这里必须尊重当前选中的 Tab，否则键盘监听一触发就会把导航弹回来。
         View nav = this$0.navIsland;
-        if (nav != null && nav.getVisibility() != View.VISIBLE) {
-            nav.setVisibility(View.VISIBLE);
+        if (nav != null) {
+            boolean onFiles = this$0.currentTabId == R.id.tabFiles;
+            nav.setVisibility(onFiles ? View.GONE : View.VISIBLE);
         }
     }
 

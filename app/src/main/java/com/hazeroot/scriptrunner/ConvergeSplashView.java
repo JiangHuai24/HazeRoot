@@ -400,7 +400,7 @@ public final class ConvergeSplashView extends View {
             float bottom = this.cy + ((this.iconSize / 2.0f) * blockS);
             float base = (this.iconSize * 0.22f) + bottom + (this.nameSize * 0.35f) + ((1.0f - e2) * this.nameSize * 0.9f);
             this.namePaint.setAlpha(RangesKt.coerceIn((int) (255.0f * e2 * fade3), 0, 255));
-            canvas.drawText("HazeRoot", this.cx, base, this.namePaint);
+            canvas.drawText("HRT", this.cx, base, this.namePaint);
         }
         canvas.restore();
     }
