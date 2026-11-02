@@ -221,20 +221,16 @@ public final class FilesFragment extends Fragment {
         Intrinsics.checkNotNullExpressionValue(findViewById4, "findViewById(...)");
         this.btnNew = findViewById4;
 
-        // 左上角「☰」：文件页隐藏了底部导航，靠它回队列页 + 打开更多菜单
+        // 左上角返回：文件页隐藏了底部导航，靠它回队列页
         View backV = v.findViewById(R.id.btnFilesBack);
         if (backV != null) {
-            backV.setOnClickListener(view2 -> showMtMainMenu());
+            backV.setOnClickListener(view2 -> {
+                android.app.Activity act = getActivity();
+                if (act instanceof MainActivity) {
+                    ((MainActivity) act).switchTo(R.id.navQueue);
+                }
+            });
         }
-
-        // 右上角「⋮」溢出菜单
-        View overflowV = v.findViewById(R.id.btnOverflow);
-        if (overflowV != null) {
-            overflowV.setOnClickListener(view2 -> showMtOverflowMenu());
-        }
-
-        // 底部工具栏 5 个按钮（MT 风格）
-        bindBottomBar(v);
         List<Pane> list = this.panes;
         View findViewById5 = v.findViewById(R.id.btnUpA);
         Intrinsics.checkNotNullExpressionValue(findViewById5, "findViewById(...)");
@@ -842,189 +838,6 @@ public final class FilesFragment extends Fragment {
         for (Pane p : panes) {
             p.refreshSel();
         }
-    }
-
-    /** 左上角 ☰ 菜单：MT 的汉堡菜单（回队列页 + 多选 + 常用动作） */
-    private void showMtMainMenu() {
-        android.widget.PopupMenu pm = new android.widget.PopupMenu(requireContext(), getView().findViewById(R.id.btnFilesBack));
-        pm.getMenu().add(0, 1, 0, "回队列页");
-        pm.getMenu().add(0, 2, 1, "多选");
-        pm.getMenu().add(0, 3, 2, "新建文件");
-        pm.getMenu().add(0, 4, 3, "新建文件夹");
-        pm.getMenu().add(0, 5, 4, "刷新");
-        pm.setOnMenuItemClickListener(item -> {
-            switch (item.getItemId()) {
-                case 1:
-                    android.app.Activity act = getActivity();
-                    if (act instanceof MainActivity) {
-                        ((MainActivity) act).switchTo(R.id.navQueue);
-                    }
-                    return true;
-                case 2:
-                    Pane p = activePane();
-                    if (p != null) {
-                        enterMulti(p);
-                        showMultiBar();
-                    }
-                    return true;
-                case 3:
-                    createFileDialog();
-                    return true;
-                case 4:
-                    createDirDialog();
-                    return true;
-                case 5:
-                    Pane ap = activePane();
-                    if (ap != null) {
-                        Pane.load$default(ap, ap.getDir(), 0, 2, null);
-                    }
-                    return true;
-                default:
-                    return false;
-            }
-        });
-        pm.show();
-    }
-
-    /** 右上角 ⋮ 溢出菜单 */
-    private void showMtOverflowMenu() {
-        android.widget.PopupMenu pm = new android.widget.PopupMenu(requireContext(), getView().findViewById(R.id.btnOverflow));
-        pm.getMenu().add(0, 1, 0, "全选");
-        pm.getMenu().add(0, 2, 1, "取消全选");
-        pm.getMenu().add(0, 3, 2, "显示/隐藏快捷路径");
-        pm.getMenu().add(0, 4, 3, "设置");
-        pm.setOnMenuItemClickListener(item -> {
-            switch (item.getItemId()) {
-                case 1:
-                    Pane p = activePane();
-                    if (p != null) {
-                        selectAllInPane(p);
-                    }
-                    return true;
-                case 2:
-                    selected.clear();
-                    Pane sp = selPane;
-                    if (sp != null) {
-                        sp.refreshSel();
-                    }
-                    exitMulti();
-                    return true;
-                case 3:
-                    View qr = getView() == null ? null : getView().findViewById(R.id.quickRow);
-                    if (qr != null) {
-                        View parent = (View) qr.getParent();
-                        if (parent != null) {
-                            parent.setVisibility(parent.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
-                        }
-                    }
-                    return true;
-                case 4:
-                    toast("设置");
-                    return true;
-                default:
-                    return false;
-            }
-        });
-        pm.show();
-    }
-
-    /** 底部 5 图标工具栏：‹ › ＋ ⬅ ↑ */
-    private void bindBottomBar(View v) {
-        View b;
-        b = v.findViewById(R.id.btnNavBack);
-        if (b != null) {
-            b.setOnClickListener(x -> {
-                Pane p = activePane();
-                if (p != null && p.canGoBack()) {
-                    p.goBack();
-                }
-            });
-        }
-        b = v.findViewById(R.id.btnNavForward);
-        if (b != null) {
-            b.setOnClickListener(x -> {
-                Pane p = activePane();
-                if (p != null && p.canGoForward()) {
-                    p.goForward();
-                }
-            });
-        }
-        // btnNew 已有旧绑定，这里不重复
-        b = v.findViewById(R.id.btnNavUp);
-        if (b != null) {
-            b.setOnClickListener(x -> {
-                Pane p = activePane();
-                if (p != null) {
-                    Pane.load$default(p, parentOf(p.getDir()), 0, 2, null);
-                }
-            });
-        }
-        b = v.findViewById(R.id.btnNavUpload);
-        if (b != null) {
-            b.setOnClickListener(x -> toast("上传/导入"));
-        }
-    }
-
-    /** 当前活动窗 */
-    private Pane activePane() {
-        return (selPane != null) ? selPane : panes.get(0);
-    }
-
-    private String parentOf(String dir) {
-        if (dir == null || dir.length() == 0 || "/".equals(dir)) {
-            return "/";
-        }
-        String d = dir.endsWith("/") ? dir.substring(0, dir.length() - 1) : dir;
-        int i = d.lastIndexOf('/');
-        return i <= 0 ? "/" : d.substring(0, i);
-    }
-
-    /**
-     * 刷新顶部路径栏与状态行（MT 的「文件夹: N  文件: N  储存: A/B」）
-     */
-    private void updateFileStatus() {
-        if (getView() == null) {
-            return;
-        }
-        Pane p = activePane();
-        if (p == null) {
-            return;
-        }
-        TextView top = (TextView) getView().findViewById(R.id.pathTop);
-        if (top != null) {
-            top.setText(p.getDir());
-        }
-        TextView status = (TextView) getView().findViewById(R.id.fileStatus);
-        if (status != null) {
-            int dirs = 0;
-            int files = 0;
-            for (FsEntry e : p.getEntries()) {
-                if (e == null) {
-                    continue;
-                }
-                if (e.getIsDir()) {
-                    dirs++;
-                } else {
-                    files++;
-                }
-            }
-            status.setText("文件夹: " + dirs + "   文件: " + files + storageInfo());
-        }
-    }
-
-    /** 储存用量（优先从当前窗的 df 输出缓存取，取不到就省略） */
-    private String storageInfo() {
-        try {
-            String out = Engine.INSTANCE.exec("df -h /data | tail -1");
-            if (out != null && out.length() > 0) {
-                String[] cols = out.trim().split("\\s+");
-                if (cols.length >= 4) {
-                    return "   储存: " + cols[2] + "/" + cols[1];
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return "";
     }
 
     /** 分发 MT 面板动作到已有能力 */
@@ -1658,8 +1471,6 @@ public final class FilesFragment extends Fragment {
                 this$1.elfMap.clear();
                 this$1.bindList();
                 this$1.probeElves(newDir);
-                // 刷新顶部路径栏与「文件夹/文件/储存」状态行（MT 风格）
-                this$0.updateFileStatus();
             }
         }
 
