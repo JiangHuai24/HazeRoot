@@ -131,26 +131,14 @@ public final class FilesFragment extends Fragment {
             To view partially-correct add '--show-bad-code' argument
         */
         public /* synthetic */ FsEntry(java.lang.String r10, java.lang.String r11, boolean r12, java.lang.String r13, long r14, java.lang.String r16, int r17, kotlin.jvm.internal.DefaultConstructorMarker r18) {
-            /*
-                r9 = this;
-                r0 = r17 & 32
-                if (r0 == 0) goto L7
-                r0 = 0
-                r8 = r0
-                goto L9
-            L7:
-                r8 = r16
-            L9:
-                r1 = r9
-                r2 = r10
-                r3 = r11
-                r4 = r12
-                r5 = r13
-                r6 = r14
-                r1.<init>(r2, r3, r4, r5, r6, r8)
-                return
-            */
-            throw new UnsupportedOperationException("Method not decompiled: com.hazeroot.scriptrunner.FilesFragment.FsEntry.<init>(java.lang.String, java.lang.String, boolean, java.lang.String, long, java.lang.String, int, kotlin.jvm.internal.DefaultConstructorMarker):void");
+            // ★ 还原 Kotlin 的 default-args 合成构造器：
+            //   r17 是"哪些参数用了默认值"的位掩码；bit 32 = linkTarget，置位表示省略。
+            //   原实现是 JADX 空壳，用五参构造 FsEntry 时必崩。
+            this(r10, r11,
+                    (r17 & 1) != 0 ? false : r12,
+                    (r17 & 8) != 0 ? "" : r13,
+                    (r17 & 16) != 0 ? 0L : r14,
+                    (r17 & 32) != 0 ? (String) null : r16);
         }
 
         public final String getName() {
@@ -4729,78 +4717,45 @@ public final class FilesFragment extends Fragment {
         To view partially-correct add '--show-bad-code' argument
     */
     public static final void chmodDialog$lambda$97$lambda$96$lambda$95(java.lang.String r17, boolean[][] r18, android.widget.CheckBox[][] r19, android.widget.TextView r20, android.view.View r21) {
-        /*
-            r0 = r17
-            r1 = r18
-            r2 = r19
-            r3 = r20
-            java.lang.String r4 = "$code"
-            kotlin.jvm.internal.Intrinsics.checkNotNullParameter(r0, r4)
-            java.lang.String r4 = "$checks"
-            kotlin.jvm.internal.Intrinsics.checkNotNullParameter(r1, r4)
-            java.lang.String r4 = "$cells"
-            kotlin.jvm.internal.Intrinsics.checkNotNullParameter(r2, r4)
-            java.lang.String r4 = "$octView"
-            kotlin.jvm.internal.Intrinsics.checkNotNullParameter(r3, r4)
-            r4 = r0
-            java.lang.CharSequence r4 = (java.lang.CharSequence) r4
-            r5 = 0
-            r6 = 0
-            r8 = 0
-        L22:
-            int r9 = r4.length()
-            if (r8 >= r9) goto L63
-            char r9 = r4.charAt(r8)
-            int r10 = r6 + 1
-            r11 = r9
-            r12 = 0
-            int r13 = kotlin.text.CharsKt.digitToInt(r11)
-            r14 = 0
-        L35:
-            r15 = 3
-            if (r14 >= r15) goto L5d
-            r15 = 1
-            switch(r14) {
-                case 0: goto L46;
-                case 1: goto L41;
-                default: goto L3c;
+        // ★ 还原被 JADX 放弃的实现：把八进制权限串逐位展开成「读/写/执行」勾选矩阵。
+        //   原为空壳，用户在「设置权限」里一勾选就崩。
+        Intrinsics.checkNotNullParameter(r17, "$code");
+        Intrinsics.checkNotNullParameter(r18, "$checks");
+        Intrinsics.checkNotNullParameter(r19, "$cells");
+        Intrinsics.checkNotNullParameter(r20, "$octView");
+
+        String code = r17;
+        for (int i = 0; i < code.length(); i++) {
+            char ch = code.charAt(i);
+            int digit;
+            try {
+                digit = kotlin.text.CharsKt.digitToInt(ch);
+            } catch (Exception ex) {
+                continue;
             }
-        L3c:
-            r16 = r13 & 1
-            if (r16 == 0) goto L4b
-            goto L4a
-        L41:
-            r16 = r13 & 2
-            if (r16 == 0) goto L4b
-            goto L4a
-        L46:
-            r16 = r13 & 4
-            if (r16 == 0) goto L4b
-        L4a:
-            goto L4c
-        L4b:
-            r15 = 0
-        L4c:
-            r16 = r1[r6]
-            r16[r14] = r15
-            r16 = r2[r6]
-            r7 = r16[r14]
-            if (r7 != 0) goto L57
-            goto L5a
-        L57:
-            r7.setChecked(r15)
-        L5a:
-            int r14 = r14 + 1
-            goto L35
-        L5d:
-            int r8 = r8 + 1
-            r6 = r10
-            goto L22
-        L63:
-            chmodDialog$refresh(r3, r1)
-            return
-        */
-        throw new UnsupportedOperationException("Method not decompiled: com.hazeroot.scriptrunner.FilesFragment.chmodDialog$lambda$97$lambda$96$lambda$95(java.lang.String, boolean[][], android.widget.CheckBox[][], android.widget.TextView, android.view.View):void");
+            if (i >= r18.length) {
+                break;
+            }
+            for (int bit = 0; bit < 3; bit++) {
+                boolean on;
+                switch (bit) {
+                    case 0:
+                        on = (digit & 4) != 0;   // 读
+                        break;
+                    case 1:
+                        on = (digit & 2) != 0;   // 写
+                        break;
+                    default:
+                        on = (digit & 1) != 0;   // 执行
+                        break;
+                }
+                r18[i][bit] = on;
+                if (i < r19.length && r19[i] != null && r19[i][bit] != null) {
+                    r19[i][bit].setChecked(on);
+                }
+            }
+        }
+        chmodDialog$refresh(r20, r18);
     }
 
     /* JADX INFO: Access modifiers changed from: private */

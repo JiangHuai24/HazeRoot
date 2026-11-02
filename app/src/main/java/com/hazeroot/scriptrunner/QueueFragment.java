@@ -623,42 +623,42 @@ public final class QueueFragment extends Fragment {
         Code decompiled incorrectly, please refer to instructions dump.
         To view partially-correct add '--show-bad-code' argument
     */
-    public static final void onViewCreated$lambda$11(com.hazeroot.scriptrunner.QueueFragment r6, android.view.View r7) {
-        /*
-            java.lang.String r0 = "this$0"
-            kotlin.jvm.internal.Intrinsics.checkNotNullParameter(r6, r0)
-            androidx.core.os.LocaleListCompat r0 = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales()
-            java.lang.String r1 = "getApplicationLocales(...)"
-            kotlin.jvm.internal.Intrinsics.checkNotNullExpressionValue(r0, r1)
-            boolean r1 = r0.isEmpty()
-            if (r1 != 0) goto L28
-            java.lang.String r1 = r0.toLanguageTags()
-            java.lang.String r2 = "toLanguageTags(...)"
-            kotlin.jvm.internal.Intrinsics.checkNotNullExpressionValue(r1, r2)
-            r2 = 2
-            r3 = 0
-            java.lang.String r4 = "en"
-            r5 = 0
-            boolean r1 = Kt.startsWith(r1, r4, r5, r2, r3)
-            if (r1 != 0) goto L29
-        L28:
-            r5 = 1
-        L29:
-            r1 = r5
-            com.hazeroot.scriptrunner.SwitchFx r2 = com.hazeroot.scriptrunner.SwitchFx.INSTANCE
-            androidx.fragment.app.FragmentActivity r3 = r6.requireActivity()
-            java.lang.String r4 = "requireActivity(...)"
-            kotlin.jvm.internal.Intrinsics.checkNotNullExpressionValue(r3, r4)
-            android.app.Activity r3 = (android.app.Activity) r3
-            int r4 = com.hazeroot.scriptrunner.R.color.bg_page
-            int r4 = r6.c(r4)
-            com.hazeroot.scriptrunner.QueueFragment$onViewCreated$15$1 r5 = new com.hazeroot.scriptrunner.QueueFragment$onViewCreated$15$1
-            r5.<init>()
-            kotlin.jvm.functions.Function0 r5 = (kotlin.jvm.functions.Function0) r5
-            r2.run(r3, r4, r5)
-            return
-        */
-        throw new UnsupportedOperationException("Method not decompiled: com.hazeroot.scriptrunner.QueueFragment.onViewCreated$lambda$11(com.hazeroot.scriptrunner.QueueFragment, android.view.View):void");
+    public static final void onViewCreated$lambda$11(final com.hazeroot.scriptrunner.QueueFragment r6, android.view.View r7) {
+        // ★ 修复「切换语言闪退」：本方法原为 JADX 未能反编译的空壳，
+        //   点「语言」直接抛 UnsupportedOperationException。
+        //   按其保留的字节码还原真实逻辑：
+        //     1. 读当前 App 语言（AppCompatDelegate.getApplicationLocales()）
+        //     2. 不是英文 → 切英文；否则 → 切中文
+        //     3. 整个过程包在 SwitchFx 的淡出/淡入过渡里
+        Intrinsics.checkNotNullParameter(r6, "this$0");
+
+        androidx.core.os.LocaleListCompat cur =
+                androidx.appcompat.app.AppCompatDelegate.getApplicationLocales();
+        Intrinsics.checkNotNullExpressionValue(cur, "getApplicationLocales(...)");
+        String tags = cur.isEmpty() ? "" : cur.toLanguageTags();
+        final boolean toEnglish = !Kt.startsWith(tags, "en", false, 2, (Object) null);
+
+        SwitchFx fx = SwitchFx.INSTANCE;
+        androidx.fragment.app.FragmentActivity act = r6.requireActivity();
+        Intrinsics.checkNotNullExpressionValue(act, "requireActivity(...)");
+        fx.run(act, r6.c(R.color.bg_page), new kotlin.jvm.functions.Function0<kotlin.Unit>() {
+            @Override // kotlin.jvm.functions.Function0
+            public kotlin.Unit invoke() {
+                applyAppLanguage(toEnglish);
+                return kotlin.Unit.INSTANCE;
+            }
+        });
+    }
+
+    /** 应用语言：toEnglish=true 切英文，否则切中文 */
+    private static void applyAppLanguage(boolean toEnglish) {
+        if (toEnglish) {
+            androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                    androidx.core.os.LocaleListCompat.forLanguageTags("en"));
+        } else {
+            androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                    androidx.core.os.LocaleListCompat.forLanguageTags("zh-CN"));
+        }
     }
 
     /* JADX INFO: Access modifiers changed from: private */

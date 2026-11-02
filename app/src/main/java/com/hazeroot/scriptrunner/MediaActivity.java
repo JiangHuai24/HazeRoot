@@ -346,20 +346,11 @@ public final class MediaActivity extends AppCompatActivity {
                 To view partially-correct add '--show-bad-code' argument
             */
             public void onProgressChanged(android.widget.SeekBar r2, int r3, boolean r4) {
-                /*
-                    r1 = this;
-                    if (r4 == 0) goto L15
-                    com.hazeroot.scriptrunner.MediaActivity r0 = com.hazeroot.scriptrunner.MediaActivity.this
-                    boolean r0 = com.hazeroot.scriptrunner.MediaActivity.access$getPrepared$p(r0)
-                    if (r0 == 0) goto L15
-                    com.hazeroot.scriptrunner.MediaActivity r0 = com.hazeroot.scriptrunner.MediaActivity.this
-                    android.media.MediaPlayer r0 = com.hazeroot.scriptrunner.MediaActivity.access$getMp$p(r0)
-                    if (r0 == 0) goto L15
-                    r0.seekTo(r3)
-                L15:
-                    return
-                */
-                throw new UnsupportedOperationException("Method not decompiled: com.hazeroot.scriptrunner.MediaActivity$onCreate$8$2.onProgressChanged(android.widget.SeekBar, int, boolean):void");
+                // ★ 还原被 JADX 放弃的实现：只在「用户拖动」时 seek，避免播放进度回调里反复 seek 死循环。
+                //   原为空壳，拖动进度条必崩。
+                if (r4 && MediaActivity.this.prepared && MediaActivity.this.mp != null) {
+                    MediaActivity.this.mp.seekTo(r3);
+                }
             }
 
             @Override // android.widget.SeekBar.OnSeekBarChangeListener
