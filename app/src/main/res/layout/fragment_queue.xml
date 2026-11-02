@@ -13,7 +13,7 @@
 
     <!-- ===== 顶栏 ===== -->
     <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="16.0dip" android:paddingTop="10.0dip" android:paddingRight="6.0dip" android:paddingBottom="6.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content">
-        <ImageView android:background="@drawable/bg_brand" android:padding="3.0dip" android:layout_width="26.0dip" android:layout_height="26.0dip" android:src="@drawable/ic_brand_h" android:contentDescription="HRT" />
+        <ImageView android:background="@drawable/bg_brand" android:padding="3.0dip" android:layout_width="26.0dip" android:layout_height="26.0dip" android:src="@drawable/ic_brand_h" android:contentDescription="HazeRoot" />
         <TextView android:textSize="20.0sp" android:textStyle="bold" android:textColor="@color/label" android:id="@id/appTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="8.0dip" android:text="@string/app_name" />
 
         <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/rootBadge" android:background="?selectableItemBackground" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="28.0dip" android:layout_marginLeft="12.0dip">

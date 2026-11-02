@@ -265,7 +265,7 @@ public final class Engine {
      */
     public final String welcomeText() {
         StringBuilder sb = new StringBuilder();
-        sb.append("HRT v2.8.4\n");
+        sb.append("HazeRoot v2.8.4\n");
         int n = scripts.size();
         if (n == 0) {
             sb.append("队列为空 · 到「队列」页添加脚本\n");

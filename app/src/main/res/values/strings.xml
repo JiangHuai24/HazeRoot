@@ -39,11 +39,11 @@
     <string name="already_root">已经是根目录</string>
     <string name="already_running">正在执行中</string>
     <string name="androidx_startup">androidx.startup</string>
-    <string name="apk_failed">无法调起安装器，请在系统设置中允许 HRT「安装未知应用」</string>
-    <string name="apk_perm_msg">安装 APK 需要「安装未知应用」权限，点「去开启」后允许 HRT 安装应用，再回来点一次安装包即可。</string>
+    <string name="apk_failed">无法调起安装器，请在系统设置中允许 HazeRoot「安装未知应用」</string>
+    <string name="apk_perm_msg">安装 APK 需要「安装未知应用」权限，点「去开启」后允许 HazeRoot 安装应用，再回来点一次安装包即可。</string>
     <string name="apk_perm_title">需要安装权限</string>
     <string name="apk_preparing">正在准备安装…</string>
-    <string name="app_name">HRT</string>
+    <string name="app_name">HazeRoot</string>
     <string name="appbar_scrolling_view_behavior">com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior</string>
     <string name="apply">应用</string>
     <string name="auto_input_fmt">>> [一键] 自动输入: %1$s</string>
@@ -310,7 +310,7 @@
     <string name="no_root_guide_title">未授权 Root</string>
     <string name="no_root_skip">暂不</string>
     <string name="no_running_script">当前没有运行中的脚本</string>
-    <string name="no_target">不设置（执行完留在 HRT）</string>
+    <string name="no_target">不设置（执行完留在 HazeRoot）</string>
     <string name="none">无</string>
     <string name="nothing_running">当前没有在执行</string>
     <string name="ok">确定</string>
@@ -338,8 +338,8 @@
     <string name="perm_need_noti_msg">队列执行需要通知权限（Android 13+）：在通知栏显示运行状态并保持后台执行不被系统杀掉。请先授权，授权后重新点执行。</string>
     <string name="perm_need_noti_title">无法执行：需要通知权限</string>
     <string name="perm_need_root_title">无法执行：需要 Root 权限</string>
-    <string name="perm_noti_denied_msg">通知权限已被拒绝（可能勾选了「不再询问」）。请到 系统设置 → 应用 → HRT → 通知 手动开启，然后回来重新执行。</string>
-    <string name="perm_onboard_msg">"HRT 需要以下授权才能正常工作：
+    <string name="perm_noti_denied_msg">通知权限已被拒绝（可能勾选了「不再询问」）。请到 系统设置 → 应用 → HazeRoot → 通知 手动开启，然后回来重新执行。</string>
+    <string name="perm_onboard_msg">"HazeRoot 需要以下授权才能正常工作：
 
 ① 通知权限 — 执行队列时在通知栏显示运行状态，并防止后台执行被系统杀掉（Android 13+）。
 
@@ -387,7 +387,7 @@
     <string name="root_denied">未获取 Root</string>
     <string name="root_denied_msg">"未获取 Root 权限。
 
-请点「打开管理器」，在 Root 管理器中允许 HRT 获得 Root/su 授权，然后回来点「重新检测」。"</string>
+请点「打开管理器」，在 Root 管理器中允许 HazeRoot 获得 Root/su 授权，然后回来点「重新检测」。"</string>
     <string name="root_mgr_title">Root 状态</string>
     <string name="root_no_mgr_found">未找到已安装的 Root 管理器应用。请确认设备已刷入 Magisk / KernelSU / APatch 之一。</string>
     <string name="root_ok_fmt">"Root 已激活 ✓
