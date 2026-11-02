@@ -90,6 +90,9 @@ public final class Engine {
     private static final StringBuilder termBuffer = new StringBuilder();
     // 终端缓冲读写锁：执行线程 append、主线程 snapshot，原实现完全无同步会读到中间态
     private static final Object TERM_LOCK = new Object();
+    // CSI 清屏/清行请求（由 feedAnsi 置位，主循环消费）
+    private static volatile boolean pendingClearScreen = false;
+    private static volatile boolean pendingClearLine = false;
     private static volatile String lastPromptText = "";
 
     /* compiled from: Engine.kt */
@@ -1125,6 +1128,16 @@ public final class Engine {
                     if (runOne$feedAnsi(esc, csi, curColor, partial, c) && runOne$showable(c)) {
                         partial.append(c);
                     }
+                    // 消费 CSI 清屏/清行请求
+                    if (pendingClearScreen) {
+                        pendingClearScreen = false;
+                        pendingClearLine = false;
+                        partial.setLength(0);
+                        clearTerm();          // 清空整屏历史
+                    } else if (pendingClearLine) {
+                        pendingClearLine = false;
+                        partial.setLength(0); // 只清当前行
+                    }
                     i++;
                 }
 
@@ -1349,6 +1362,38 @@ public final class Engine {
                     String sb = csi.toString();
                     Intrinsics.checkNotNullExpressionValue(sb, "toString(...)");
                     runOne$applySgr(curColor, partial, sb);
+                    esc.element = 0;
+                    csi.setLength(0);
+                } else if (ch == 'J' || ch == 'K' || ch == 'H' || ch == 'G' || ch == 'A' || ch == 'B' || ch == 'C' || ch == 'D' || ch == 'f') {
+                    // 修复：CSI 光标/清屏序列（原先全部被丢弃，导致脚本清屏画菜单完全失效）。
+                    // TextView 渲染模型下做等价语义近似：
+                    //   J = 清屏      → 标记全清
+                    //   K = 清到行尾  → 清空当前行
+                    //   H/f/G/A = 光标归位/上移 → 回到行首（清空当前行缓冲）
+                    //   B/C/D = 光标下移/前移 → 忽略（不影响文本累积）
+                    int p1 = 0;
+                    try {
+                        String body = csi.toString();
+                        if (body.length() > 0) {
+                            int semi = body.indexOf(';');
+                            String first = semi > 0 ? body.substring(0, semi) : body;
+                            first = first.trim();
+                            if (first.length() > 0) {
+                                p1 = Integer.parseInt(first);
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                    if (ch == 'J') {
+                        // 清屏：p1=2/3 全清，0/1 也按全清处理（TextView 无「光标到末尾」概念）
+                        pendingClearScreen = true;
+                    } else if (ch == 'K') {
+                        pendingClearLine = true;
+                    } else if (ch == 'H' || ch == 'f' || ch == 'G' || ch == 'A') {
+                        if (p1 <= 1) {
+                            pendingClearLine = true;
+                        }
+                    }
                     esc.element = 0;
                     csi.setLength(0);
                 } else if (Character.isDigit(ch) || ch == ';' || ch == '?' || ch == ':' || ch == '<' || ch == '=' || ch == '>') {
