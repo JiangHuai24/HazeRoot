@@ -459,6 +459,17 @@ public final class FilesFragment extends Fragment {
 
     /* JADX INFO: Access modifiers changed from: private */
     public final void restylePanes() {
+        // 修复（R3 A 级痛点）：原先「当前窗」的高亮只落在 30dp 的路径栏背景上，
+        // 占屏 90% 的列表区两窗完全一样，用户无法一眼判断「我在操作哪一边」。
+        // 现在给当前窗的整列容器加一层很淡的 accent 底色，非当前窗保持透明。
+        View paneA = getView() != null ? getView().findViewById(R.id.paneA) : null;
+        View paneB = getView() != null ? getView().findViewById(R.id.paneB) : null;
+        if (paneA != null) {
+            paneA.setBackgroundResource(this.activeIdx == 0 ? R.drawable.bg_pane_active : 0);
+        }
+        if (paneB != null) {
+            paneB.setBackgroundResource(this.activeIdx == 1 ? R.drawable.bg_pane_active : 0);
+        }
         Iterable $this$forEach$iv = this.panes;
         for (Object element$iv : $this$forEach$iv) {
             Pane p = (Pane) element$iv;

@@ -243,6 +243,8 @@
     <item type="id" name="open_search_view_toolbar_container" />
     <item type="id" name="parentPanel" />
     <item type="id" name="parent_matrix" />
+    <item type="id" name="paneA" />
+    <item type="id" name="paneB" />
     <item type="id" name="pathA" />
     <item type="id" name="pathB" />
     <item type="id" name="pickHint" />

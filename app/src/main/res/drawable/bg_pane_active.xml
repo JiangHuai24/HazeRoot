@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 当前窗（活动窗）的极淡底色，用于双窗时一眼区分「我在操作哪一边」。
+     刻意做得非常克制（6% accent），避免抢走列表内容的视觉重心。 -->
+<shape
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/accent_tint8" />
+</shape>
