@@ -1811,6 +1811,11 @@ public final class FilesFragment extends Fragment {
                 } else {
                     v.removeCallbacks(longPress);
                     if (Math.abs(dx) > Math.abs(dy) * 1.2f) {
+                        // 修复（R3）：多选态下禁用左滑 reveal，避免与「批量选择」手势互相干扰
+                        // （MT 里多选时不会有单条左滑操作）。
+                        if (this$0.multiMode) {
+                            break;
+                        }
                         mode.element = 1;
                         ViewParent parent2 = v.getParent();
                         if (parent2 != null) {
