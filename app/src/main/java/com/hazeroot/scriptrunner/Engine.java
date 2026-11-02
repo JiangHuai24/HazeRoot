@@ -88,6 +88,8 @@ public final class Engine {
     private static final Object recordLock = new Object();
     private static volatile String presetTargetApp = "";
     private static final StringBuilder termBuffer = new StringBuilder();
+    // 终端缓冲读写锁：执行线程 append、主线程 snapshot，原实现完全无同步会读到中间态
+    private static final Object TERM_LOCK = new Object();
     private static volatile String lastPromptText = "";
 
     /* compiled from: Engine.kt */
@@ -175,23 +177,71 @@ public final class Engine {
     public final void log(String line, char style) {
         Intrinsics.checkNotNullParameter(line, "line");
         Log.d(TAG, "term| " + line);
-        if (style != ' ') {
-            termBuffer.append((char) 1).append(style);
+        // 修复竞态：termBuffer 在执行线程写、主线程读（syncTerm），必须同步
+        synchronized (TERM_LOCK) {
+            if (style != ' ') {
+                termBuffer.append((char) 1).append(style);
+            }
+            termBuffer.append(line).append('\n');
+            trimTermLocked();
         }
-        termBuffer.append(line).append('\n');
-        trimTerm();
         emit("log", line);
     }
 
     private final void logRaw(StringBuilder raw) {
-        termBuffer.append((CharSequence) raw).append('\n');
-        trimTerm();
+        synchronized (TERM_LOCK) {
+            termBuffer.append((CharSequence) raw).append('\n');
+            trimTermLocked();
+        }
         emit("log", plainOf(raw));
     }
 
-    private final void trimTerm() {
-        if (termBuffer.length() > MAX_TERM_CHARS) {
-            termBuffer.delete(0, termBuffer.length() - MAX_TERM_CHARS);
+    /**
+     * 行边界裁剪（调用方必须已持有 TERM_LOCK）。
+     *
+     * 原实现按 char 数直接 delete(0, len-MAX)，裁剪点可能落在
+     * 「\u0001 + styleChar」这对 ANSI 样式标记的中间，产生孤立 \u0001，
+     * 使 QueueFragment.appendStyled 从该点开始全部错位（表现为显示不全/乱码/丢行）。
+     *
+     * 这里改为：先算出目标裁剪位置，再向后搜索到最近的 '\n' 之后裁剪，
+     * 保证永远从一个完整行的行首开始保留，绝不切断标记对。
+     */
+    private final void trimTermLocked() {
+        int len = termBuffer.length();
+        if (len <= MAX_TERM_CHARS) {
+            return;
+        }
+        int cut = len - MAX_TERM_CHARS;
+        // 向后找最近的换行符；找不到就退化为从 0 开始（极端情况）
+        int nl = termBuffer.indexOf("\n", cut);
+        if (nl >= 0 && nl + 1 < len) {
+            cut = nl + 1;                       // 从下一行行首开始保留
+        } else {
+            cut = 0;                            // 无法找到行边界：整段保留，避免错位
+        }
+        if (cut > 0) {
+            termBuffer.delete(0, cut);
+        }
+    }
+
+    /** 供 UI 线程安全读取当前终端缓冲（快照，避免读到中间态） */
+    public final String snapshotTerm() {
+        synchronized (TERM_LOCK) {
+            return termBuffer.toString();
+        }
+    }
+
+    /** 线程安全地判断终端缓冲是否为空 */
+    public final boolean isTermEmpty() {
+        synchronized (TERM_LOCK) {
+            return termBuffer.length() == 0;
+        }
+    }
+
+    /** 线程安全地清空终端缓冲 */
+    public final void clearTerm() {
+        synchronized (TERM_LOCK) {
+            termBuffer.setLength(0);
         }
     }
 

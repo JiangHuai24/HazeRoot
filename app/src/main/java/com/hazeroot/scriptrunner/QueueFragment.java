@@ -195,7 +195,7 @@ public final class QueueFragment extends Fragment {
             view2 = null;
         }
         view2.setVisibility(Engine.INSTANCE.getLastPromptText().length() == 0 ? 8 : 0);
-        if (Engine.INSTANCE.getTermBuffer().length() == 0) {
+        if (Engine.INSTANCE.isTermEmpty()) {
             printWelcome();
         }
         syncTerm();
@@ -483,7 +483,7 @@ public final class QueueFragment extends Fragment {
     /* JADX INFO: Access modifiers changed from: private */
     public static final void onViewCreated$lambda$5(QueueFragment this$0, View it) {
         Intrinsics.checkNotNullParameter(this$0, "this$0");
-        Engine.INSTANCE.getTermBuffer().setLength(0);
+        Engine.INSTANCE.clearTerm();
         this$0.renderedChars = 0;
         this$0.syncTerm();
     }
@@ -824,7 +824,8 @@ public final class QueueFragment extends Fragment {
 
     /* JADX INFO: Access modifiers changed from: private */
     public final void syncTerm() {
-        String buf = Engine.INSTANCE.getTermBuffer().toString();
+        // 修复竞态：改用带锁快照，避免执行线程 append 时读到中间态（半行/半标记）
+        String buf = Engine.INSTANCE.snapshotTerm();
         Intrinsics.checkNotNullExpressionValue(buf, "toString(...)");
         TextView textView = this.term;
         ScrollView scrollView = null;
