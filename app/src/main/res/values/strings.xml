@@ -456,4 +456,18 @@ su 可用，但未识别出管理器应用（可能已隐藏）。"</string>
     <string name="write_fail_fmt">写入 %1$s 失败</string>
     <string name="zip_ok">已压缩</string>
     <string name="zip_to_fmt">压缩到%1$s</string>
+    <string name="device_title">设备</string>
+    <string name="device_info">设备信息</string>
+    <string name="refresh">刷新</string>
+    <string name="thermal_title">温度与限频</string>
+    <string name="thermal_reading">正在读取…</string>
+    <string name="thermal_switch">温控开关</string>
+    <string name="thermal_l1_title">L1 · 解除框架热节流（低风险）</string>
+    <string name="thermal_l1_desc">把系统热状态强制为 NONE，可随时恢复</string>
+    <string name="thermal_l1_off">解除节流</string>
+    <string name="thermal_l1_reset">恢复原厂</string>
+    <string name="thermal_l2_note">L2 频率直控 / L3 小米配置覆写属高风险，本轮未开放</string>
+    <string name="refresh_title">屏幕刷新率</string>
+    <string name="refresh_reading">正在读取…</string>
+    <string name="refresh_reset">恢复系统默认</string>
 </resources>

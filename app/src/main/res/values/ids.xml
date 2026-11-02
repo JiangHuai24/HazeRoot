@@ -349,4 +349,15 @@
     <item type="id" name="view_tree_view_model_store_owner" />
     <item type="id" name="visible_removing_fragment_view_tag" />
     <item type="id" name="with_icon" />
+    <item type="id" name="btnBack" />
+    <item type="id" name="btnRefresh" />
+    <item type="id" name="tvDeviceInfo" />
+    <item type="id" name="tvThermalState" />
+    <item type="id" name="tvThermalDetail" />
+    <item type="id" name="btnThermalOff" />
+    <item type="id" name="btnThermalReset" />
+    <item type="id" name="tvRefreshCurrent" />
+    <item type="id" name="refreshButtons" />
+    <item type="id" name="btnRefreshReset" />
+    <item type="id" name="btnDevice" />
 </resources>

@@ -418,6 +418,13 @@ public final class QueueFragment extends Fragment {
                 QueueFragment.onViewCreated$lambda$12(QueueFragment.this, view5);
             }
         });
+        // 设备页入口：设备信息 + 温度/限频 + 温控开关 + 屏幕刷新率
+        v.findViewById(R.id.btnDevice).setOnClickListener(new View.OnClickListener() {
+            @Override // android.view.View.OnClickListener
+            public final void onClick(View view) {
+                startActivity(new android.content.Intent(requireContext(), (Class<?>) DeviceActivity.class));
+            }
+        });
     }
 
     /* JADX INFO: Access modifiers changed from: private */

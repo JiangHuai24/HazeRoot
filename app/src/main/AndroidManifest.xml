@@ -37,6 +37,7 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths"/>
         </provider>
         <activity android:exported="false" android:name="com.hazeroot.scriptrunner.ManualActivity"/>
+        <activity android:exported="false" android:name="com.hazeroot.scriptrunner.DeviceActivity"/>
         <activity android:exported="false" android:name="com.hazeroot.scriptrunner.MediaActivity"/>
         <service android:exported="false" android:foregroundServiceType="dataSync" android:name="com.hazeroot.scriptrunner.RunnerService"/>
     </application>
