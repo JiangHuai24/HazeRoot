@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#ffeeedfe" />
-    <corners android:radius="999.0dip" />
+<!-- accent 色调 chip。
+     原写死 #ffeeedfe（近白）→ 日间浅底上几乎看不见。
+     改用 accent 低透明度。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/accent_tint14" />
+    <corners android:radius="9.0dip" />
 </shape>

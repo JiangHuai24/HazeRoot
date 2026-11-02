@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#ffbbdefb" />
+<!-- 文件行多选选中态背景。
+     原写死 #ffbbdefb（固定浅蓝）→ 夜间模式下这行会突然变成亮蓝块。
+     改用 accent 的低透明度，日夜各自生效。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/accent_tint" />
+    <corners android:radius="4.0dip" />
 </shape>

@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- MT 风格居中悬浮面板背景：深色圆角 -->
+<!--
+  浮动面板 / 菜单背景。
+  ★ 修复「日间模式下 ☰ 菜单深底配深字，几乎看不见」：
+    原先是写死的深色 #FF20242C，日间模式文字是 #2A3147 深蓝灰，
+    深字画在深底上对比度趋近 0，菜单像半透明残影。
+    现在改用语义色 bg_elevated，日夜各自取对应值：
+      夜间 #202330（深） + 文字 #A9B1D6（亮）  → 对比 6.9:1
+      日间 #CED1DB（浅） + 文字 #2A3147（深）  → 对比 8.4:1
+-->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#FF20242C" />
+    <solid android:color="@color/bg_elevated" />
     <corners android:radius="14.0dip" />
 </shape>

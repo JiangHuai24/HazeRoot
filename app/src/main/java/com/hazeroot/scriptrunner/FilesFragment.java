@@ -492,11 +492,9 @@ public final class FilesFragment extends Fragment {
 
     /* JADX INFO: Access modifiers changed from: private */
     public final void restylePanes() {
-        // ★ 按用户反馈重做「当前窗」标识：
-        //   原先两层蓝色叠加（整列 bg_pane_active 淡蓝底 + 路径 bg_pick_hint 蓝底），
-        //   肉眼观感是"一片诡异蓝块"。
-        //   现在：①整列底色一律去掉（不染列表）②路径框保持同一中性底
-        //        ③只把当前窗的路径文字染成 accent 色 —— 用文字色分区，不用色块分区。
+        // ★ 当前窗标识：用「路径文字颜色」单点表达，不再给整列加底色。
+        //   之前给整列加 bg_pane_active 淡色底 → 日间模式下左窗整块变灰，
+        //   看起来像窗口坏了。现在两窗背景完全一致，只有当前窗路径文字是强调色。
         View paneA = getView() != null ? getView().findViewById(R.id.paneA) : null;
         View paneB = getView() != null ? getView().findViewById(R.id.paneB) : null;
         if (paneA != null) {
@@ -512,7 +510,6 @@ public final class FilesFragment extends Fragment {
             if (pv == null) {
                 continue;
             }
-            // 两窗用同一种中性底，避免"一边蓝一边灰"的割裂感
             pv.setBackgroundResource(R.drawable.bg_quick_chip);
             pv.setTextColor(panes.indexOf(p) == activeIdx ? accent : dim);
         }
@@ -555,7 +552,7 @@ public final class FilesFragment extends Fragment {
         TextView tipClose = new TextView(requireContext());
         tipClose.setText("×");
         tipClose.setTextSize(18);
-        tipClose.setTextColor(0xFFB8BCC8);
+        tipClose.setTextColor(colorOf(R.color.label_secondary));
         tipClose.setGravity(android.view.Gravity.CENTER);
         tipClose.setPadding(dp(10), dp(2), dp(10), dp(2));
         tipClose.setOnClickListener(v -> dialog.dismiss());
@@ -591,7 +588,7 @@ public final class FilesFragment extends Fragment {
                 TextView cell = new TextView(requireContext());
                 cell.setText(arrow.length() > 0 ? (label + "  " + arrow) : label);
                 cell.setTextSize(14);
-                cell.setTextColor(0xFFE8EAF0);
+                cell.setTextColor(colorOf(R.color.label));
                 cell.setGravity(android.view.Gravity.CENTER_VERTICAL);
                 cell.setPadding(dp(16), 0, dp(8), 0);
                 cell.setBackgroundResource(R.drawable.bg_mt_panel_item);
@@ -665,7 +662,7 @@ public final class FilesFragment extends Fragment {
         TextView title = new TextView(requireContext());
         title.setText(e.getName());
         title.setTextSize(11);
-        title.setTextColor(0xFF8A8F9E);
+        title.setTextColor(colorOf(R.color.label_secondary));
         title.setPadding(dp(16), dp(12), dp(16), dp(6));
         root.addView(title);
 
@@ -674,7 +671,7 @@ public final class FilesFragment extends Fragment {
             TextView cell = new TextView(requireContext());
             cell.setText(o[0]);
             cell.setTextSize(14);
-            cell.setTextColor(0xFFE8EAF0);
+            cell.setTextColor(colorOf(R.color.label));
             cell.setGravity(android.view.Gravity.CENTER_VERTICAL);
             cell.setPadding(dp(16), 0, dp(16), 0);
             cell.setBackgroundResource(R.drawable.bg_mt_panel_item);
@@ -730,7 +727,7 @@ public final class FilesFragment extends Fragment {
         TextView title = new TextView(requireContext());
         title.setText("已选 " + selected.size() + " 项");
         title.setTextSize(15);
-        title.setTextColor(0xFFE8EAF0);
+        title.setTextColor(colorOf(R.color.label));
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         head.addView(title);
@@ -738,7 +735,7 @@ public final class FilesFragment extends Fragment {
         TextView close = new TextView(requireContext());
         close.setText("×");
         close.setTextSize(18);
-        close.setTextColor(0xFFB8BCC8);
+        close.setTextColor(colorOf(R.color.label_secondary));
         close.setGravity(android.view.Gravity.CENTER);
         close.setPadding(dp(10), dp(2), dp(10), dp(2));
         close.setOnClickListener(v -> dialog.dismiss());
@@ -761,7 +758,7 @@ public final class FilesFragment extends Fragment {
                 TextView cell = new TextView(requireContext());
                 cell.setText(label);
                 cell.setTextSize(14);
-                cell.setTextColor("4".equals(code) ? 0xFFE86A5A : 0xFFE8EAF0);
+                cell.setTextColor("4".equals(code) ? colorOf(R.color.error_text) : colorOf(R.color.label));
                 cell.setGravity(android.view.Gravity.CENTER_VERTICAL);
                 cell.setPadding(dp(16), 0, dp(16), 0);
                 cell.setBackgroundResource(R.drawable.bg_mt_panel_item);

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  PopupWindow 专用背景：圆角 + 无描边。
-  ★ 作为 PopupWindow 的 backgroundDrawable 使用时，
-    drawable 会作为窗口底色，圆角外自然透明 —— 不会出现白色角。
+  PopupWindow 专用背景（☰ / ⋮ 锚定菜单）。
+  ★ 同上修复：原写死 #FF20242C，日间模式深底深字看不见。
+    改用语义色 bg_elevated，日夜各自适配。
 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#FF20242C" />
+    <solid android:color="@color/bg_elevated" />
     <corners android:radius="13.0dip" />
 </shape>
