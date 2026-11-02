@@ -1126,6 +1126,21 @@ public final class FilesFragment extends Fragment {
                         }
                         nameV.setText(e.getName());
                         meta.setText(e.getPerm() + "  \u00b7  " + this.this$0.fmtSize(e.getSize()));
+                        // 修复（R3/R6）：长文件名被 middle 省略时，长按文件名弹「完整名 + 完整路径」兜底。
+                        // 只对 fName 生效，不干扰整行的长按多选手势（行手势由 bindSwipe 处理）。
+                        final FsEntry fe = e;
+                        final FilesFragment hostFrag = this.this$0;
+                        nameV.setOnLongClickListener(new View.OnLongClickListener() {
+                            @Override // android.view.View.OnLongClickListener
+                            public final boolean onLongClick(View nv) {
+                                new AlertDialog.Builder(hostFrag.requireContext())
+                                        .setTitle(R.string.detail_path)
+                                        .setMessage(fe.getName() + "\n\n" + fe.getPath())
+                                        .setPositiveButton(R.string.good, (DialogInterface.OnClickListener) null)
+                                        .show();
+                                return true;
+                            }
+                        });
                     }
                     this.this$0.bindSwipe(v, e);
                     return v;
