@@ -288,8 +288,10 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private final void setTabActive(Tab tab, boolean active) {
-        int color = ContextCompat.getColor(this, active ? R.color.accent : R.color.label_tertiary);
-        tab.getPill().setBackground(active ? ContextCompat.getDrawable(this, R.drawable.bg_tab_pill) : null);
+        // 底部导航：单色极简（对齐江南工具箱 + MT 范式）
+        // 选中 = 主色文字（亮），未选中 = 三级灰；去掉彩色胶囊底，避免"AI 味"
+        int color = ContextCompat.getColor(this, active ? R.color.label : R.color.label_tertiary);
+        tab.getPill().setBackground(null);
         DrawableCompat.setTint(tab.getIcon().getDrawable().mutate(), color);
         tab.getLabel().setTextColor(color);
     }

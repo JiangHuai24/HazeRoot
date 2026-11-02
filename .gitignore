@@ -18,3 +18,6 @@ recovery/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# 本地自动快照（灾难恢复备份，不入库）
+backup-auto/
