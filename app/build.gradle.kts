@@ -40,6 +40,9 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.0.1")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+
+    // 单元测试：覆盖纯 Java 核心逻辑（温控解析 / 刷新率命令 / 编码解码 / 应答匹配）
+    testImplementation("junit:junit:4.13.2")
 }
 
 // 重建期：放开 javac 错误显示上限

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 首页图标：单色线条，颜色由 ImageView tint 控制（选中/未选中只改明度） -->
+<vector android:height="24.0dip" android:width="24.0dip" android:viewportWidth="24.0" android:viewportHeight="24.0"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <path android:fillColor="#FF000000" android:pathData="M12,3L2,12h3v8h6v-6h2v6h6v-8h3L12,3zM12,5.7l5,4.5V18h-2v-6H9v6H7v-7.8L12,5.7z" />
+</vector>

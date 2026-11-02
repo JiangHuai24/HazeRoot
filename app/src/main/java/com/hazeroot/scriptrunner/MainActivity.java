@@ -52,6 +52,8 @@ import kotlin.text.StringsKt;
 public final class MainActivity extends AppCompatActivity {
     public static final String SCRIPT_DIR = "/data/adb/HazeRoot";
     private FilesFragment files;
+    private HomeFragment home;
+    private TerminalFragment terminal;
     private View navIsland;
     private ActivityResultLauncher<String> onboardNotiLauncher;
     private PresetsFragment presets;
@@ -111,6 +113,8 @@ public final class MainActivity extends AppCompatActivity {
         this.queue = new QueueFragment();
         this.files = new FilesFragment();
         this.presets = new PresetsFragment();
+        this.home = new HomeFragment();
+        this.terminal = new TerminalFragment();
         FragmentTransaction beginTransaction = getSupportFragmentManager().beginTransaction();
         int i = R.id.navContainer;
         QueueFragment queueFragment = this.queue;
@@ -134,6 +138,13 @@ public final class MainActivity extends AppCompatActivity {
             presetsFragment2 = null;
         }
         FragmentTransaction add3 = add2.add(i3, presetsFragment2, "presets");
+        // 新增两个页面：首页 / 终端
+        if (this.home != null) {
+            add3 = add3.add(R.id.navContainer, this.home, "home");
+        }
+        if (this.terminal != null) {
+            add3 = add3.add(R.id.navContainer, this.terminal, "terminal");
+        }
         FilesFragment filesFragment2 = this.files;
         if (filesFragment2 == null) {
             Intrinsics.throwUninitializedPropertyAccessException("files");
@@ -146,7 +157,15 @@ public final class MainActivity extends AppCompatActivity {
         } else {
             presetsFragment = presetsFragment3;
         }
-        hide.hide(presetsFragment).commit();
+        hide = hide.hide(presetsFragment);
+        // 新页面初始也隐藏（首屏落在队列页）
+        if (this.home != null) {
+            hide = hide.hide(this.home);
+        }
+        if (this.terminal != null) {
+            hide = hide.hide(this.terminal);
+        }
+        hide.commit();
         View findViewById = findViewById(R.id.bottomNav);
         Intrinsics.checkNotNullExpressionValue(findViewById, "findViewById(...)");
         this.navIsland = findViewById;
@@ -172,6 +191,22 @@ public final class MainActivity extends AppCompatActivity {
         View findViewById9 = findViewById(R.id.labelFiles);
         Intrinsics.checkNotNullExpressionValue(findViewById9, "findViewById(...)");
         linkedHashMap2.put(valueOf2, new Tab(findViewById6, findViewById7, (ImageView) findViewById8, (TextView) findViewById9));
+        // 新增 Tab：首页
+        View tabHomeRoot = findViewById(R.id.tabHome);
+        View iconHomeV = findViewById(R.id.iconHome);
+        View labelHomeV = findViewById(R.id.labelHome);
+        if (tabHomeRoot != null && iconHomeV != null && labelHomeV != null) {
+            this.tabs.put(Integer.valueOf(R.id.tabHome),
+                    new Tab(tabHomeRoot, tabHomeRoot, (ImageView) iconHomeV, (TextView) labelHomeV));
+        }
+        // 新增 Tab：终端
+        View tabTermRoot = findViewById(R.id.tabTerminal);
+        View iconTermV = findViewById(R.id.iconTerminal);
+        View labelTermV = findViewById(R.id.labelTerminal);
+        if (tabTermRoot != null && iconTermV != null && labelTermV != null) {
+            this.tabs.put(Integer.valueOf(R.id.tabTerminal),
+                    new Tab(tabTermRoot, tabTermRoot, (ImageView) iconTermV, (TextView) labelTermV));
+        }
         LinkedHashMap<Integer, Tab> linkedHashMap3 = this.tabs;
         Integer valueOf3 = Integer.valueOf(R.id.tabPresets);
         View findViewById10 = findViewById(R.id.tabPresets);
@@ -198,7 +233,6 @@ public final class MainActivity extends AppCompatActivity {
             }
         });
         this.tabFragments.put(Integer.valueOf(R.id.tabFiles), new Function0<Fragment>() { // from class: com.hazeroot.scriptrunner.MainActivity$onCreate$3
-
             /* JADX WARN: Can't rename method to resolve collision */
             @Override // kotlin.jvm.functions.Function0
             public final Fragment invoke() {
@@ -223,6 +257,19 @@ public final class MainActivity extends AppCompatActivity {
                 }
                 Intrinsics.throwUninitializedPropertyAccessException("presets");
                 return null;
+            }
+        });
+        // 新增 Tab → Fragment 映射
+        this.tabFragments.put(Integer.valueOf(R.id.tabHome), new Function0<Fragment>() {
+            @Override // kotlin.jvm.functions.Function0
+            public final Fragment invoke() {
+                return MainActivity.this.home;
+            }
+        });
+        this.tabFragments.put(Integer.valueOf(R.id.tabTerminal), new Function0<Fragment>() {
+            @Override // kotlin.jvm.functions.Function0
+            public final Fragment invoke() {
+                return MainActivity.this.terminal;
             }
         });
         Map<Integer, Tab> $this$forEach$iv = this.tabs;
@@ -288,18 +335,28 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private final void setTabActive(Tab tab, boolean active) {
-        // 底部导航：单色极简（对齐江南工具箱 + MT 范式）
-        // 选中 = 主色文字（亮），未选中 = 三级灰；去掉彩色胶囊底，避免"AI 味"
+        // 底部导航（江南工具箱式）：单色极简，**图标不染品牌色**。
+        // 选中 = 主文字色（亮），未选中 = 三级灰；只改明度，不改色相。
         int color = ContextCompat.getColor(this, active ? R.color.label : R.color.label_tertiary);
-        tab.getPill().setBackground(null);
-        DrawableCompat.setTint(tab.getIcon().getDrawable().mutate(), color);
-        tab.getLabel().setTextColor(color);
+        View pill = tab.getPill();
+        if (pill != null) {
+            pill.setBackground(null);
+        }
+        ImageView icon = tab.getIcon();
+        if (icon != null && icon.getDrawable() != null) {
+            DrawableCompat.setTint(icon.getDrawable().mutate(), color);
+        }
+        TextView label = tab.getLabel();
+        if (label != null) {
+            label.setTextColor(color);
+            label.setTypeface(null, active ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        }
     }
 
     private final void show(Fragment f) {
         FragmentTransaction tx = getSupportFragmentManager().beginTransaction();
         Intrinsics.checkNotNullExpressionValue(tx, "beginTransaction(...)");
-        Fragment[] fragmentArr = new Fragment[3];
+        Fragment[] fragmentArr = new Fragment[5];
         QueueFragment queueFragment = this.queue;
         FilesFragment filesFragment = null;
         if (queueFragment == null) {
@@ -319,7 +376,9 @@ public final class MainActivity extends AppCompatActivity {
             presetsFragment = null;
         }
         fragmentArr[2] = presetsFragment;
-        Iterable $this$forEach$iv = CollectionsKt.listOf((Object[]) fragmentArr);
+        fragmentArr[3] = this.home;
+        fragmentArr[4] = this.terminal;
+        Iterable $this$forEach$iv = CollectionsKt.listOfNotNull((Object[]) fragmentArr);
         for (Object element$iv : $this$forEach$iv) {
             Fragment it = (Fragment) element$iv;
             if (it != f) {

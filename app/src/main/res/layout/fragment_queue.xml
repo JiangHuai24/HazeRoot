@@ -1,55 +1,93 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout android:orientation="vertical" android:background="@color/bg_page" android:layout_width="fill_parent" android:layout_height="fill_parent" android:animateLayoutChanges="true"
+<!--
+  队列页布局 · 去 AI 味改造版
+  改动要点：
+    1. 顶栏 3 行 → 1 行：标题 20sp + root 状态点 + ⋮ 溢出菜单
+    2. 删掉脚本列表卡片 / 添加按钮卡片（改分割线 + 纯文字行）
+    3. 字号 8 档 → 5 档（20 / 15 / 14 / 12 / 12mono）
+    4. 间距引入 24 / 12 / 8 三档节奏
+    5. 移除 animateLayoutChanges（避免整块跳动）
+  保留：终端面板（唯一的「面」）、输入框（需要边界）
+-->
+<LinearLayout android:orientation="vertical" android:background="@color/bg_page" android:layout_width="fill_parent" android:layout_height="fill_parent"
   xmlns:android="http://schemas.android.com/apk/res/android">
-    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="16.0dip" android:paddingTop="12.0dip" android:paddingRight="8.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content">
-        <ImageView android:background="@drawable/bg_brand" android:padding="3.0dip" android:layout_width="28.0dip" android:layout_height="28.0dip" android:src="@drawable/ic_brand_h" android:contentDescription="HazeRoot" />
-        <TextView android:textSize="24.0sp" android:textStyle="bold" android:textColor="@color/label" android:id="@id/appTitle" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_marginLeft="10.0dip" android:text="@string/app_name" android:layout_weight="1.0" />
-        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnDevice" android:background="@drawable/bg_quick_chip" android:paddingLeft="10.0dip" android:paddingRight="10.0dip" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="28.0dip" android:layout_marginRight="6.0dip" android:text="@string/device_title" />
-        <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnGuide" android:background="@drawable/bg_quick_chip" android:focusable="true" android:clickable="true" android:layout_width="28.0dip" android:layout_height="28.0dip" android:layout_marginRight="6.0dip" android:text="\?" />
-        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnLang" android:background="@drawable/bg_quick_chip" android:paddingLeft="10.0dip" android:paddingRight="10.0dip" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="28.0dip" android:layout_marginRight="6.0dip" android:text="@string/lang_toggle" />
-        <ImageView android:id="@id/btnTheme" android:background="@drawable/btn_icon_bg" android:padding="12.0dip" android:layout_width="44.0dip" android:layout_height="44.0dip" android:src="@drawable/ic_moon" android:contentDescription="@string/cd_toggle_theme" />
-    </LinearLayout>
-    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/rootBadge" android:background="?selectableItemBackground" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="24.0dip" android:layout_marginLeft="16.0dip" android:layout_marginTop="2.0dip">
-        <View android:id="@id/rootDot" android:background="@drawable/dot_running" android:layout_width="7.0dip" android:layout_height="7.0dip" />
-        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:id="@id/rootText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="6.0dip" android:text="@string/root_checking" />
-    </LinearLayout>
-    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/scriptsHeader" android:background="?selectableItemBackground" android:paddingLeft="16.0dip" android:paddingTop="16.0dip" android:paddingRight="16.0dip" android:paddingBottom="4.0dip" android:focusable="true" android:clickable="true" android:layout_width="fill_parent" android:layout_height="wrap_content">
-        <TextView android:textSize="20.0sp" android:textStyle="bold" android:textColor="@color/label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/queue_title" />
-        <TextView android:textSize="13.0sp" android:textStyle="bold" android:textColor="@color/accent" android:gravity="center" android:id="@id/countBadge" android:background="@drawable/bg_count_badge" android:paddingLeft="8.0dip" android:paddingRight="8.0dip" android:layout_width="wrap_content" android:layout_height="24.0dip" android:layout_marginLeft="10.0dip" android:minWidth="28.0dip" android:text="0" />
+
+    <!-- ===== 顶栏：一行搞定 ===== -->
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="16.0dip" android:paddingTop="10.0dip" android:paddingRight="6.0dip" android:paddingBottom="6.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <ImageView android:background="@drawable/bg_brand" android:padding="3.0dip" android:layout_width="26.0dip" android:layout_height="26.0dip" android:src="@drawable/ic_brand_h" android:contentDescription="HazeRoot" />
+        <TextView android:textSize="20.0sp" android:textStyle="bold" android:textColor="@color/label" android:id="@id/appTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="8.0dip" android:text="@string/app_name" />
+
+        <!-- root 状态：极简点 + 文字，去掉胶囊底 -->
+        <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/rootBadge" android:background="?selectableItemBackground" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="28.0dip" android:layout_marginLeft="12.0dip">
+            <View android:id="@id/rootDot" android:background="@drawable/dot_running" android:layout_width="6.0dip" android:layout_height="6.0dip" />
+            <TextView android:textSize="12.0sp" android:textColor="@color/label_secondary" android:id="@id/rootText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="5.0dip" android:text="@string/root_checking" />
+        </LinearLayout>
+
         <View android:layout_width="0.0dip" android:layout_height="1.0dip" android:layout_weight="1.0" />
-        <TextView android:textSize="16.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:id="@id/toggleArrow" android:padding="6.0dip" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="▾" />
+
+        <!-- 设备入口：保留（高频） -->
+        <TextView android:textSize="12.0sp" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnDevice" android:background="?selectableItemBackgroundBorderless" android:paddingLeft="10.0dip" android:paddingRight="10.0dip" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="36.0dip" android:text="@string/device_title" />
+        <!-- 溢出：? / 语言 / 主题 收进一个 ⋮ -->
+        <TextView android:textSize="18.0sp" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnMore" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="40.0dip" android:layout_height="40.0dip" android:text="⋮" />
+
+        <!-- 保留原有 id 但隐藏（MainActivity 仍会 findViewById 绑定，避免空指针） -->
+        <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnGuide" android:visibility="gone" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="0.0dip" android:text="\?" />
+        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnLang" android:visibility="gone" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="0.0dip" android:text="@string/lang_toggle" />
+        <ImageView android:id="@id/btnTheme" android:visibility="gone" android:focusable="true" android:clickable="true" android:layout_width="0.0dip" android:layout_height="0.0dip" android:src="@drawable/ic_moon" android:contentDescription="@string/cd_toggle_theme" />
     </LinearLayout>
-    <TextView android:textSize="13.0sp" android:textColor="@color/label_secondary" android:ellipsize="end" android:gravity="center_vertical" android:id="@id/summaryText" android:paddingLeft="16.0dip" android:paddingRight="16.0dip" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="40.0dip" android:singleLine="true" />
+
+    <!-- ===== 队列标题（区块标题 15sp） ===== -->
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/scriptsHeader" android:background="?selectableItemBackground" android:paddingLeft="16.0dip" android:paddingTop="14.0dip" android:paddingRight="16.0dip" android:paddingBottom="6.0dip" android:focusable="true" android:clickable="true" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="@color/label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/queue_title" />
+        <TextView android:textSize="12.0sp" android:textColor="@color/label_tertiary" android:id="@id/countBadge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="6.0dip" android:text="0" />
+        <View android:layout_width="0.0dip" android:layout_height="1.0dip" android:layout_weight="1.0" />
+        <TextView android:textSize="14.0sp" android:textColor="@color/label_tertiary" android:id="@id/toggleArrow" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="▾" />
+    </LinearLayout>
+
+    <TextView android:textSize="12.0sp" android:textColor="@color/label_secondary" android:ellipsize="end" android:gravity="center_vertical" android:id="@id/summaryText" android:paddingLeft="16.0dip" android:paddingRight="16.0dip" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="36.0dip" android:singleLine="true" />
+
+    <!-- ===== 脚本列表：无卡片，靠分割线 ===== -->
     <LinearLayout android:orientation="vertical" android:id="@id/scriptsBody" android:layout_width="fill_parent" android:layout_height="wrap_content">
-        <FrameLayout android:background="@drawable/bg_card" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginLeft="16.0dip" android:layout_marginTop="6.0dip" android:layout_marginRight="16.0dip">
-            <androidx.recyclerview.widget.RecyclerView android:id="@id/queueList" android:layout_width="fill_parent" android:layout_height="wrap_content" android:overScrollMode="never" android:nestedScrollingEnabled="false" />
-        </FrameLayout>
-        <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="@color/accent" android:gravity="center" android:id="@id/btnAdd" android:background="@drawable/bg_add_row" android:focusable="true" android:clickable="true" android:layout_width="fill_parent" android:layout_height="48.0dip" android:layout_marginLeft="16.0dip" android:layout_marginTop="8.0dip" android:layout_marginRight="16.0dip" android:text="@string/add_script" android:drawablePadding="10.0dip" android:drawableStart="@drawable/ic_add" />
+        <androidx.recyclerview.widget.RecyclerView android:id="@id/queueList" android:layout_width="fill_parent" android:layout_height="wrap_content" android:overScrollMode="never" android:nestedScrollingEnabled="false" />
+
+        <!-- 添加脚本：纯文字行，无卡片底 -->
+        <TextView android:textSize="14.0sp" android:textColor="@color/accent" android:gravity="center_vertical" android:id="@id/btnAdd" android:background="?selectableItemBackground" android:paddingLeft="16.0dip" android:paddingTop="14.0dip" android:paddingBottom="14.0dip" android:focusable="true" android:clickable="true" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="@string/add_script" android:drawablePadding="8.0dip" android:drawableStart="@drawable/ic_add" />
+
         <LinearLayout android:gravity="center_horizontal" android:orientation="vertical" android:id="@id/emptyState" android:paddingBottom="4.0dip" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="8.0dip">
-            <ImageView android:layout_width="40.0dip" android:layout_height="40.0dip" android:src="@drawable/ic_empty" android:contentDescription="@string/cd_empty" />
-            <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="@color/label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10.0dip" android:text="@string/empty_title" />
+            <ImageView android:layout_width="36.0dip" android:layout_height="36.0dip" android:src="@drawable/ic_empty" android:contentDescription="@string/cd_empty" />
+            <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="@color/label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8.0dip" android:text="@string/empty_title" />
             <TextView android:textSize="12.0sp" android:textColor="@color/label_secondary" android:gravity="center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2.0dip" android:text="@string/empty_hint" />
         </LinearLayout>
     </LinearLayout>
-    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="28.0dip" android:layout_marginLeft="16.0dip" android:layout_marginTop="16.0dip" android:layout_marginRight="16.0dip">
-        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/label_secondary" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="TERMINAL" android:layout_weight="1.0" android:letterSpacing="0.08" />
-        <TextView android:textSize="13.0sp" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnClear" android:background="?selectableItemBackground" android:paddingLeft="10.0dip" android:paddingRight="10.0dip" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="28.0dip" android:text="@string/clear" />
+
+    <!-- ===== 终端标题 ===== -->
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="26.0dip" android:layout_marginLeft="16.0dip" android:layout_marginTop="18.0dip" android:layout_marginRight="16.0dip">
+        <TextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/label_tertiary" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="TERMINAL" android:layout_weight="1.0" android:letterSpacing="0.1" />
+        <TextView android:textSize="12.0sp" android:textColor="@color/label_secondary" android:gravity="center" android:id="@id/btnClear" android:background="?selectableItemBackgroundBorderless" android:paddingLeft="10.0dip" android:paddingRight="10.0dip" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="26.0dip" android:text="@string/clear" />
     </LinearLayout>
-    <FrameLayout android:layout_width="fill_parent" android:layout_height="0.0dip" android:layout_marginLeft="16.0dip" android:layout_marginTop="6.0dip" android:layout_marginRight="16.0dip" android:layout_weight="1.0">
+
+    <!-- ===== 终端面板（唯一的「面」） ===== -->
+    <FrameLayout android:layout_width="fill_parent" android:layout_height="0.0dip" android:layout_marginLeft="16.0dip" android:layout_marginTop="2.0dip" android:layout_marginRight="16.0dip" android:layout_weight="1.0">
         <ScrollView android:id="@id/termScroll" android:background="@drawable/bg_term" android:scrollbars="none" android:layout_width="fill_parent" android:layout_height="fill_parent" android:minHeight="100.0dip" android:overScrollMode="never">
-            <TextView android:textSize="14.0sp" android:textColor="@color/term_text" android:id="@id/termView" android:paddingLeft="14.0dip" android:paddingTop="12.0dip" android:paddingRight="14.0dip" android:paddingBottom="12.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content" android:lineSpacingExtra="6.0dip" android:fontFamily="monospace" />
+            <TextView android:textSize="12.0sp" android:textColor="@color/term_text" android:id="@id/termView" android:paddingLeft="12.0dip" android:paddingTop="10.0dip" android:paddingRight="12.0dip" android:paddingBottom="10.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content" android:lineSpacingExtra="4.0dip" android:fontFamily="monospace" />
         </ScrollView>
     </FrameLayout>
-    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/promptRow" android:background="@drawable/bg_prompt" android:paddingLeft="12.0dip" android:paddingRight="12.0dip" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="38.0dip" android:layout_marginLeft="16.0dip" android:layout_marginTop="8.0dip" android:layout_marginRight="16.0dip">
+
+    <!-- ===== 提示行：只用一个点 + 文字，不要整条横幅 ===== -->
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/promptRow" android:paddingLeft="16.0dip" android:paddingRight="16.0dip" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="32.0dip" android:layout_marginTop="6.0dip">
         <View android:background="@drawable/dot_running" android:layout_width="6.0dip" android:layout_height="6.0dip" />
-        <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="@color/prompt_text" android:ellipsize="end" android:id="@id/promptView" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_marginLeft="8.0dip" android:singleLine="true" android:layout_weight="1.0" />
+        <TextView android:textSize="12.0sp" android:textColor="@color/prompt_text" android:ellipsize="end" android:id="@id/promptView" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_marginLeft="6.0dip" android:singleLine="true" android:layout_weight="1.0" />
     </LinearLayout>
+
+    <!-- ===== 输入框（保留边界） ===== -->
     <FrameLayout android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginLeft="16.0dip" android:layout_marginTop="8.0dip" android:layout_marginRight="16.0dip">
-        <EditText android:textSize="16.0sp" android:textColor="@color/label" android:textColorHint="@color/label_tertiary" android:ellipsize="end" android:gravity="center_vertical" android:id="@id/manualInput" android:background="@drawable/bg_input" android:paddingLeft="14.0dip" android:paddingRight="52.0dip" android:layout_width="fill_parent" android:layout_height="46.0dip" android:hint="@string/input_hint" android:singleLine="true" android:inputType="text" android:imeOptions="actionSend" />
-        <ImageView android:layout_gravity="end|center" android:id="@id/btnSend" android:background="?selectableItemBackgroundBorderless" android:padding="11.0dip" android:layout_width="44.0dip" android:layout_height="44.0dip" android:layout_marginRight="2.0dip" android:src="@drawable/ic_send" android:contentDescription="@string/cd_send" />
+        <EditText android:textSize="14.0sp" android:textColor="@color/label" android:textColorHint="@color/label_tertiary" android:ellipsize="end" android:gravity="center_vertical" android:id="@id/manualInput" android:background="@drawable/bg_input" android:paddingLeft="12.0dip" android:paddingRight="48.0dip" android:layout_width="fill_parent" android:layout_height="44.0dip" android:hint="@string/input_hint" android:singleLine="true" android:inputType="text" android:imeOptions="actionSend" />
+        <ImageView android:layout_gravity="end|center" android:id="@id/btnSend" android:background="?selectableItemBackgroundBorderless" android:padding="10.0dip" android:layout_width="42.0dip" android:layout_height="42.0dip" android:layout_marginRight="2.0dip" android:src="@drawable/ic_send" android:contentDescription="@string/cd_send" />
     </FrameLayout>
-    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginLeft="16.0dip" android:layout_marginTop="10.0dip" android:layout_marginRight="16.0dip" android:layout_marginBottom="12.0dip">
-        <Button android:id="@id/btnRun" android:background="@drawable/btn_accent_bg" android:paddingLeft="20.0dip" android:paddingRight="20.0dip" android:layout_width="0.0dip" android:layout_height="48.0dip" android:text="@string/run_all" android:drawablePadding="8.0dip" android:layout_weight="1.0" style="@style/BtnPrimary" />
-        <ImageView android:id="@id/btnStop" android:background="@drawable/bg_stop_circle" android:padding="10.0dip" android:layout_width="44.0dip" android:layout_height="44.0dip" android:layout_marginLeft="10.0dip" android:src="@drawable/ic_stop" android:contentDescription="@string/cd_stop" android:alpha="0.35" />
+
+    <!-- ===== 执行 / 停止 ===== -->
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginLeft="16.0dip" android:layout_marginTop="8.0dip" android:layout_marginRight="16.0dip" android:layout_marginBottom="12.0dip">
+        <Button android:id="@id/btnRun" android:background="@drawable/btn_accent_bg" android:paddingLeft="20.0dip" android:paddingRight="20.0dip" android:layout_width="0.0dip" android:layout_height="46.0dip" android:text="@string/run_all" android:drawablePadding="8.0dip" android:layout_weight="1.0" style="@style/BtnPrimary" />
+        <ImageView android:id="@id/btnStop" android:background="@drawable/bg_stop_circle" android:padding="10.0dip" android:layout_width="42.0dip" android:layout_height="42.0dip" android:layout_marginLeft="10.0dip" android:src="@drawable/ic_stop" android:contentDescription="@string/cd_stop" android:alpha="0.35" />
     </LinearLayout>
 </LinearLayout>

@@ -470,4 +470,6 @@ su 可用，但未识别出管理器应用（可能已隐藏）。"</string>
     <string name="refresh_title">屏幕刷新率</string>
     <string name="refresh_reading">正在读取…</string>
     <string name="refresh_reset">恢复系统默认</string>
+    <string name="tab_home">首页</string>
+    <string name="tab_terminal">终端</string>
 </resources>

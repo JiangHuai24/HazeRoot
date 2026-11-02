@@ -360,4 +360,10 @@
     <item type="id" name="refreshButtons" />
     <item type="id" name="btnRefreshReset" />
     <item type="id" name="btnDevice" />
+    <item type="id" name="tabHome" />
+    <item type="id" name="iconHome" />
+    <item type="id" name="labelHome" />
+    <item type="id" name="tabTerminal" />
+    <item type="id" name="iconTerminal" />
+    <item type="id" name="labelTerminal" />
 </resources>
