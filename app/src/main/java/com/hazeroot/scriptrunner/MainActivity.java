@@ -337,6 +337,9 @@ public final class MainActivity extends AppCompatActivity {
 
     private final void selectTab(int id) {
         Fragment invoke;
+        // ★ 记录当前 Tab，供键盘监听（onCreate$lambda$3）判断是否该显示底部导航。
+        //   之前只声明未赋值，键盘一弹出就把文件页的导航重新弹回来。
+        this.currentTabId = id;
         Map<Integer, Tab> $this$forEach$iv = this.tabs;
         for (Map.Entry<Integer, Tab> element$iv : $this$forEach$iv.entrySet()) {
             int tid = element$iv.getKey().intValue();
