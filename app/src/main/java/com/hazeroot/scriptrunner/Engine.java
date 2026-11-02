@@ -860,6 +860,8 @@ public final class Engine {
             String msg = c.getString(R.string.file_missing_fmt, s.getPath());
             Intrinsics.checkNotNullExpressionValue(msg, "getString(...)");
             log(msg, S_ERR);
+            // 修复：文件缺失时显式置 exitCode=-1，避免 ScriptAdapter 把 exitCode==null 显示成绿点"成功"
+            s.setExitCode(Integer.valueOf(-1));
             return;
         }
         String hex = Kt.replace(probeOut, " ", "", false, 4, (Object) null);
@@ -1067,8 +1069,29 @@ public final class Engine {
         synchronized (recordLock) {
             collect = recordingCollect;
             if (collect != null) {
+                // 修复「录制→重放」闭环断裂：
+                // 把 recordingCollect(Map<prompt, List<value>>) 展开为扁平 List<RecordedInput>，
+                // 写回 ScriptItem.recordedInputs，再落盘。此前这里只 saveScripts，
+                // 但 recordedInputs 字段从未被 setRecordedInputs 写回，导致存方案时 rec 恒为空，
+                // 重放时一个答案都不会回。
+                List<RecordedInput> recorded = new ArrayList<>();
+                for (Map.Entry<String, List<String>> en : collect.entrySet()) {
+                    String prompt = en.getKey();
+                    List<String> vals = en.getValue();
+                    if (prompt == null || vals == null) {
+                        continue;
+                    }
+                    for (String v : vals) {
+                        if (v != null) {
+                            recorded.add(new RecordedInput(prompt, v));
+                        }
+                    }
+                }
+                if (!recorded.isEmpty()) {
+                    s.setRecordedInputs(recorded);
+                }
                 Store.INSTANCE.saveScripts(appCtx, scripts);
-                Log.d(TAG, "录制落盘 " + s.getName() + "：" + collect.keySet());
+                Log.d(TAG, "录制落盘 " + s.getName() + "：共 " + recorded.size() + " 条应答，prompt 数=" + collect.keySet().size());
             }
             recordingCollect = null;
         }
