@@ -13,6 +13,10 @@ import java.util.Locale;
  *       所以"显示隐藏文件"开关的默认值必须是 true，否则会改变现有行为。
  *  2. {@link #filterScriptsOnly} —— 只显示 .sh 脚本
  *     HazeRoot 是脚本执行器，找 .sh 是文件页的主要目的。
+ * <p><b>⚠ 尚未接线</b>：本类当前<b>没有任何生产代码调用</b>，
+ * 实际运行的是 {@code FilesFragment} 内的旧内联实现。
+ * 因此单测覆盖的是「未被使用的代码」，请勿把本类当作运行时行为的真值来源。
+ * 接线计划见 docs/core-fs接入审查.md。
  */
 public final class FileFilter {
 

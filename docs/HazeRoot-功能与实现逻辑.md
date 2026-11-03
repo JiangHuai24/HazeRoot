@@ -752,6 +752,8 @@ private final String resolveAnswer(ScriptItem s, String line, boolean auto) { re
 ```
 已与 v2.7.2 smali 逐行核对：**v2.7.2 原本就是 `const/4 v0, 0x0 / return-object v0`**，且全工程无任何调用点，属死代码，无需实现。
 
+**现状**：该空壳已在后续清理中删除，相关逻辑由 Engine.runOne 内联的应答匹配承担。
+
 ---
 
 ## 6. UI 层逐模块实现
@@ -1140,7 +1142,7 @@ MANAGE_EXTERNAL_STORAGE        <!-- 所有文件访问 -->
 |---|---|---|
 | **① int→float 丢失** | `int/int` 变整数除法，动画数值全错 | 按 smali 补回浮点转换（如 `ConvergeSplashView` 的插值） |
 | **② 方法彻底放弃** | `throw new UnsupportedOperationException("Method not decompiled: ...")` | 按 smali 手工回写（`Engine.runOne`，4680 行） |
-| **③ 静默桩方法** | `{ return null; }` | 需与 smali 对照：`resolveAnswer` **原本就是 `return null`** → 死代码，保留 |
+| **③ 静默桩方法** | `{ return null; }` | 需与 smali 对照：`resolveAnswer` **原本就是 `return null`** → 死代码；现已删除 |
 | **④ `$default` mask 丢失** | Kotlin 合成方法默认值语义丢失 → 出现 `null` 字面量 | 手写 `Kt` 补齐 mask 判断（见 9.4） |
 
 **判断准则**：凡是 `UnsupportedOperationException` 或可疑 `return null`，都对照本地留存的 smali 素材逐行核对，**不要凭 Kotlin 语义猜测**。

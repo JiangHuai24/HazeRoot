@@ -126,6 +126,23 @@ public class LsParserTest {
         assertTrue(list.get(0).isHidden());
     }
 
+    @Test
+    public void parse_crlfOutput_nameHasNoCarriageReturn() {
+        // CRLF 输出（PC 端采集 / Windows 工具链）：若只按 \n 切，\r 会留在文件名末尾，
+        // 导致后缀判断（.sh / .apk）全部失败、文件名显示异常。
+        String out = "-rwxr-xr-x 1 root root 1024 2024-01-01 00:00 run.sh\r\n"
+                + "drwxr-xr-x 2 root root 4096 2024-01-01 00:00 sub\r\n";
+        List<FileEntry> list = LsParser.parse(out, "/x");
+        assertEquals(2, list.size());
+        FileEntry sh = find(list, "run.sh");
+        assertNotNull("CRLF 下 run.sh 应被正确解析（名字不能带 \\r）", sh);
+        assertFalse(sh.isDir());
+        assertFalse(sh.getName().contains("\r"));
+        FileEntry dir = find(list, "sub");
+        assertNotNull(dir);
+        assertTrue(dir.isDir());
+    }
+
     private static FileEntry find(List<FileEntry> list, String name) {
         for (FileEntry e : list) {
             if (name.equals(e.getName())) {

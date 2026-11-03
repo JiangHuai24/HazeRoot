@@ -6,6 +6,10 @@ package com.hazeroot.scriptrunner.core.fs;
  * 从 FilesFragment.FsEntry 抽出。抽出的意义：
  *  - 可以在 JVM 单元测试里直接构造，不需要 Android 环境
  *  - 解析器（LsParser）、排序（FileSort）、过滤（FileFilter）都只依赖它
+ * <p><b>⚠ 尚未接线</b>：本类当前<b>没有任何生产代码调用</b>，
+ * 实际运行的是 {@code FilesFragment} 内的旧内联实现。
+ * 因此单测覆盖的是「未被使用的代码」，请勿把本类当作运行时行为的真值来源。
+ * 接线计划见 docs/core-fs接入审查.md。
  */
 public final class FileEntry {
 

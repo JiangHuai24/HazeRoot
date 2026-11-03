@@ -38,7 +38,6 @@ import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import com.hazeroot.scriptrunner.FilesFragment;
-import com.hazeroot.scriptrunner.core.fs.PathUtil;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;

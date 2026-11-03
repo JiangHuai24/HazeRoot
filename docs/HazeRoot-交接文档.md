@@ -175,7 +175,7 @@ adb shell "am start -n com.hazeroot.scriptrunner/.SplashActivity"
 |---|---|---|
 | ① `int→float` 丢失 | `int/int` 变整数除法，动画数值全错 | 按 smali 补回浮点转换 |
 | ② 方法彻底放弃 | `throw new UnsupportedOperationException("Method not decompiled: ...")` | 按 smali 手工回写 |
-| ③ 静默桩方法 | `{ return null; }` | **必须与 smali 对照**：`Engine.resolveAnswer` 原本就是 `return null`（死代码），不是缺陷 |
+| ③ 静默桩方法 | `{ return null; }` | **必须与 smali 对照**：`Engine.resolveAnswer` 原本就是 `return null`（死代码），不是缺陷；**该空壳已于本次清理中删除** |
 | ④ `$default` mask 丢失 | 默认值语义丢失，出现字面量 `null` | 手写 `Kt` 补齐 mask 判断 |
 
 **准则**：凡遇 `UnsupportedOperationException` 或可疑 `return null`，去 `recovery/apktool_out/smali_classes*/` 逐行核对，**不要凭 Kotlin 语义猜测**。

@@ -19,6 +19,10 @@ import java.util.regex.Pattern;
  *
  * 为什么抽出来：这段逻辑原本内联在 4858 行的 FilesFragment 里，
  * 且是 JADX 还原的 while 循环 + goto 风格，完全无法测试。抽出后可单测。
+ * <p><b>⚠ 尚未接线</b>：本类当前<b>没有任何生产代码调用</b>，
+ * 实际运行的是 {@code FilesFragment} 内的旧内联实现。
+ * 因此单测覆盖的是「未被使用的代码」，请勿把本类当作运行时行为的真值来源。
+ * 接线计划见 docs/core-fs接入审查.md。
  */
 public final class LsParser {
 
@@ -55,7 +59,9 @@ public final class LsParser {
             base = "/";
         }
 
-        for (String line : lsOutput.split("\n")) {
+        // 用 \r?\n 兼容 CRLF：若上游（PC 端采集 / Windows 工具链）产出 \r\n，
+        // 只按 \n 切会把 \r 留在行尾，导致正则末段的文件名带 \r、后缀匹配全部失败。
+        for (String line : lsOutput.split("\r?\n")) {
             FileEntry e = parseLine(line, base);
             if (e != null) {
                 out.add(e);

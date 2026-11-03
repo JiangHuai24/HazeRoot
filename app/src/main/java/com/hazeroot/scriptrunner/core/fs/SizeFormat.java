@@ -13,6 +13,10 @@ import java.util.Locale;
  *  </pre>
  * 注意：原实现没有 GB 档，超过 1024MB 仍显示为 M（如 2048.0M）。
  * 这里保持原行为不变 —— 重构的原则是等价，不是改行为。
+ * <p><b>⚠ 尚未接线</b>：本类当前<b>没有任何生产代码调用</b>，
+ * 实际运行的是 {@code FilesFragment} 内的旧内联实现。
+ * 因此单测覆盖的是「未被使用的代码」，请勿把本类当作运行时行为的真值来源。
+ * 接线计划见 docs/core-fs接入审查.md。
  */
 public final class SizeFormat {
 

@@ -12,6 +12,10 @@ import java.util.List;
  *  - {@link #record} 记录一次成功访问；重复记录同一目录不产生新条目
  *  - 记录新目录时截断"前进"分支（浏览器式行为）
  *  - {@link #back} / {@link #forward} 移动游标并返回目标目录
+ * <p><b>⚠ 尚未接线</b>：本类当前<b>没有任何生产代码调用</b>，
+ * 实际运行的是 {@code FilesFragment} 内的旧内联实现。
+ * 因此单测覆盖的是「未被使用的代码」，请勿把本类当作运行时行为的真值来源。
+ * 接线计划见 docs/core-fs接入审查.md。
  */
 public final class DirHistory {
 

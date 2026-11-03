@@ -5,6 +5,10 @@ package com.hazeroot.scriptrunner.core.fs;
  *
  * 这些操作原本散落在 FilesFragment / MainActivity 各处（取父级、拼路径、取文件名），
  * 每处各写一份，且都是反编译的 Kotlin 内联调用（StringsKt.substringBeforeLast 之类）。
+ * <p><b>⚠ 尚未接线</b>：本类当前<b>没有任何生产代码调用</b>，
+ * 实际运行的是 {@code FilesFragment} 内的旧内联实现。
+ * 因此单测覆盖的是「未被使用的代码」，请勿把本类当作运行时行为的真值来源。
+ * 接线计划见 docs/core-fs接入审查.md。
  */
 public final class PathUtil {
 
@@ -60,7 +64,8 @@ public final class PathUtil {
             return "";
         }
         int dot = name.lastIndexOf('.');
-        if (dot < 0 || dot >= name.length() - 1) {
+        // dot == 0 表示整个名字就是个点文件（.gitignore / .bashrc），这类没有"扩展名"的概念
+        if (dot <= 0 || dot >= name.length() - 1) {
             return "";
         }
         return name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);

@@ -76,5 +76,10 @@ public class PathUtilTest {
         assertEquals("", PathUtil.extension("noext"));
         assertEquals("", PathUtil.extension("a."));
         assertEquals("", PathUtil.extension(null));
+        // 点文件（整名就是扩展名）没有"扩展名"概念，必须返回空
+        assertEquals("", PathUtil.extension(".gitignore"));
+        assertEquals("", PathUtil.extension(".bashrc"));
+        // 中间带点的正常文件仍取最后一段
+        assertEquals("gz", PathUtil.extension("a.tar.gz"));
     }
 }

@@ -293,7 +293,7 @@ public final class MediaActivity extends AppCompatActivity {
                         }
                         TextView play = this$0.btnPlay;
                         if (play != null) {
-                            play.setText("\u25B6");
+                            MediaActivity.setPlayIcon(play);
                         }
                         return true;
                     }
@@ -505,7 +505,7 @@ public final class MediaActivity extends AppCompatActivity {
         player.start();
         TextView textView = this$0.btnPlay;
         if (textView != null) {
-            textView.setText("\u23F8");
+            MediaActivity.setPauseIcon(textView);
         }
         this$0.h.post(this$0.tick);
     }
@@ -517,7 +517,7 @@ public final class MediaActivity extends AppCompatActivity {
         if (textView == null) {
             return;
         }
-        textView.setText("\u25B6");
+        MediaActivity.setPlayIcon(textView);
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -542,7 +542,7 @@ public final class MediaActivity extends AppCompatActivity {
         }
         TextView play = this$0.btnPlay;
         if (play != null) {
-            play.setText("\u25B6");
+            MediaActivity.setPlayIcon(play);
         }
         return true;
     }
@@ -557,14 +557,14 @@ public final class MediaActivity extends AppCompatActivity {
                 m.start();
                 TextView textView = this.btnPlay;
                 if (textView != null) {
-                    textView.setText("\u23F8");
+                    MediaActivity.setPauseIcon(textView);
                 }
                 return;
             }
             m.pause();
             TextView textView2 = this.btnPlay;
             if (textView2 != null) {
-                textView2.setText("\u25B6");
+                MediaActivity.setPlayIcon(textView2);
             }
         } catch (Exception e) {
         }
@@ -714,6 +714,20 @@ public final class MediaActivity extends AppCompatActivity {
         } catch (Exception ignored) {
         }
         super.onStop();
+    }
+
+    /** 播放图标：显示 ▶（点击开始播放） */
+    static void setPlayIcon(TextView v) {
+        if (v != null) {
+            v.setText("\u25B6");
+        }
+    }
+
+    /** 暂停图标：显示 ⏸（点击暂停） */
+    static void setPauseIcon(TextView v) {
+        if (v != null) {
+            v.setText("\u23F8");
+        }
     }
 
     /* JADX INFO: Access modifiers changed from: private */
