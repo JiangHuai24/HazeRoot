@@ -1953,48 +1953,18 @@ public final class FilesFragment extends Fragment {
                 err = err4;
             }
             if (out != null) {
-                Iterable $this$forEach$iv = StringsKt.lines(out);
-                int $i$f$forEach2 = 0;
-                Iterator it2 = $this$forEach$iv.iterator();
-                while (it2.hasNext()) {
-                    Object element$iv = it2.next();
-                    Iterable $this$forEach$iv2 = $this$forEach$iv;
-                    MatchResult m = FilesFragment.LS_RE.find((CharSequence) element$iv, i3);
-                    if (m == null) {
-                        line = str;
-                        $i$f$forEach = $i$f$forEach2;
-                        it = it2;
-                        i = i3;
-                    } else {
-                        MatchResult.Destructured destructured = m.getDestructured();
-                        String perm = destructured.getMatch().getGroupValues().get(1);
-                        String sizeS = destructured.getMatch().getGroupValues().get(i2);
-                        String rawName = destructured.getMatch().getGroupValues().get(3);
-                        $i$f$forEach = $i$f$forEach2;
-                        it = it2;
-                        line = null;
-                        String target = Kt.contains((CharSequence) rawName, (CharSequence) " -> ", false, 2, (Object) null) ? StringsKt.trim((CharSequence) Kt.substringAfter(rawName, " -> ", (String) null, 2, (Object) null)).toString() : null;
-                        String name = StringsKt.trim((CharSequence) Kt.substringBefore(rawName, " -> ", (String) null, 2, (Object) null)).toString();
-                        if (Intrinsics.areEqual(name, ".") || Intrinsics.areEqual(name, "..")) {
-                            i = 0;
-                        } else {
-                            if (name.length() == 0) {
-                                i = 0;
-                            } else {
-                                i = 0;
-                                String str2 = StringsKt.trimEnd(newDir, '/') + "/" + name;
-                                boolean z = perm.charAt(0) == 'd';
-                                Long longOrNull = StringsKt.toLongOrNull(sizeS);
-                                parsed.add(new FsEntry(name, str2, z, perm, longOrNull != null ? longOrNull.longValue() : 0L, target));
-                            }
-                        }
-                    }
-                    i3 = i;
-                    str = line;
-                    $this$forEach$iv = $this$forEach$iv2;
-                    $i$f$forEach2 = $i$f$forEach;
-                    it2 = it;
-                    i2 = 2;
+                // ★ 接入新结构：解析交给 hazefs.LsParser（17 个单测覆盖，含真机样本）。
+                //   这段原本是 JADX 还原的 while+goto 循环（用了 i2/i3/str/line 等
+                //   编译器临时变量），替换后行为完全等价：
+                //     · 正则同一条
+                //     · "." / ".." / 空名丢弃
+                //     · " -> " 拆软链目标
+                //     · 目录取自权限首位 'd'
+                //     · 大小解析失败按 0
+                for (com.hazeroot.scriptrunner.hazefs.FileEntry he
+                        : com.hazeroot.scriptrunner.hazefs.LsParser.parse(out, newDir)) {
+                    parsed.add(new FsEntry(he.getName(), he.getPath(), he.isDir(),
+                            he.getPerm(), he.getSize(), he.getLinkTarget()));
                 }
             }
             final String error = err;
@@ -2046,7 +2016,9 @@ public final class FilesFragment extends Fragment {
                 // ★ 显示过滤：在排序之前做，作用于 entries 层
                 //   ① 显示隐藏文件（默认 true —— 现有 ls -Al 本来就列点文件，默认关闭会改变现有行为）
                 //   ② 只显示 .sh 脚本（HazeRoot 是脚本执行器，找脚本是文件页主要目的）
-                // 注意：list 是裸 List（JADX 产物无泛型），removeIf 需按原始类型遍历删除
+                // 判断逻辑委托给 hazefs.FileFilter（8 个单测覆盖），
+                // 但删除仍需就地做 —— list 是裸 List（JADX 产物无泛型），
+                // 不能直接换成 FileFilter.apply() 返回的新列表。
                 for (int fi = list.size() - 1; fi >= 0; fi--) {
                     Object fo = list.get(fi);
                     if (!(fo instanceof FsEntry)) {
@@ -2058,50 +2030,35 @@ public final class FilesFragment extends Fragment {
                         drop = true;
                     }
                     if (this$0.onlyScripts
-                            && (fe.getIsDir() || !fe.getName().toLowerCase(Locale.ROOT).endsWith(".sh"))) {
+                            && (fe.getIsDir()
+                            || !com.hazeroot.scriptrunner.hazefs.FileFilter
+                            .isShellScript(fe.getName()))) {
                         drop = true;
                     }
                     if (drop) {
                         list.remove(fi);
                     }
                 }
-                final Comparator comparator = new Comparator() { // from class: com.hazeroot.scriptrunner.FilesFragment$Pane$load$lambda$10$lambda$9$$inlined$compareByDescending$1
-                    /* JADX WARN: Multi-variable type inference failed */
-                    @Override // java.util.Comparator
-                    public final int compare(Object t2, Object t3) {
-                        FilesFragment.FsEntry it = (FilesFragment.FsEntry) t3;
-                        Boolean valueOf = Boolean.valueOf(it.getIsDir());
-                        FilesFragment.FsEntry it2 = (FilesFragment.FsEntry) t2;
-                        return ComparisonsKt.compareValues(valueOf, Boolean.valueOf(it2.getIsDir()));
+                // ★ 接入新结构：排序交给 hazefs.FileSort（7 个单测覆盖）。
+                //   原本这里是两层嵌套匿名 Comparator（compareByDescending + thenBy 的
+                //   JADX 还原产物），现等价替换：
+                //     · 目录优先（dirsFirst=true，与原实现一致）
+                //     · 按名称忽略大小写升序 / 按大小降序
+                //     · 大小相同退回名称比较，保证顺序稳定
+                final java.util.Comparator<FsEntry> cmp = new java.util.Comparator<FsEntry>() {
+                    @Override
+                    public int compare(FsEntry a, FsEntry b) {
+                        com.hazeroot.scriptrunner.hazefs.FileSort.Mode mode =
+                                "size".equals(this$0.sortMode)
+                                        ? com.hazeroot.scriptrunner.hazefs.FileSort.Mode.SIZE
+                                        : com.hazeroot.scriptrunner.hazefs.FileSort.Mode.NAME;
+                        com.hazeroot.scriptrunner.hazefs.FileEntry ea = toHaze(a);
+                        com.hazeroot.scriptrunner.hazefs.FileEntry eb = toHaze(b);
+                        return com.hazeroot.scriptrunner.hazefs.FileSort.comparator(mode, true)
+                                .compare(ea, eb);
                     }
                 };
-                // ★ 排序：目录优先不变；目录内按用户选择（名称 / 大小）
-                final boolean bySize = "size".equals(this$0.sortMode);
-                CollectionsKt.sortWith(list, new Comparator() { // from class: com.hazeroot.scriptrunner.FilesFragment$Pane$load$lambda$10$lambda$9$$inlined$thenBy$1
-                    /* JADX WARN: Multi-variable type inference failed */
-                    @Override // java.util.Comparator
-                    public final int compare(Object t2, Object t3) {
-                        int previousCompare = comparator.compare(t2, t3);
-                        if (previousCompare != 0) {
-                            return previousCompare;
-                        }
-                        FilesFragment.FsEntry it = (FilesFragment.FsEntry) t2;
-                        FilesFragment.FsEntry it2 = (FilesFragment.FsEntry) t3;
-                        if (bySize) {
-                            // 大的在前
-                            long s1 = it.getSize();
-                            long s2 = it2.getSize();
-                            if (s1 != s2) {
-                                return s1 > s2 ? -1 : 1;
-                            }
-                        }
-                        String lowerCase = it.getName().toLowerCase(Locale.ROOT);
-                        Intrinsics.checkNotNullExpressionValue(lowerCase, "toLowerCase(...)");
-                        String lowerCase2 = it2.getName().toLowerCase(Locale.ROOT);
-                        Intrinsics.checkNotNullExpressionValue(lowerCase2, "toLowerCase(...)");
-                        return ComparisonsKt.compareValues(lowerCase, lowerCase2);
-                    }
-                });
+                CollectionsKt.sortWith(list, cmp);
                 this$1.entries = list;
                 this$1.elfMap.clear();
                 this$1.bindList();
@@ -4838,17 +4795,26 @@ public final class FilesFragment extends Fragment {
 
     /* JADX INFO: Access modifiers changed from: private */
     public final String fmtSize(long b) {
-        if (b >= 1048576) {
-            String format = String.format("%.1fM", Arrays.copyOf(new Object[]{Float.valueOf(b / 1048576.0f)}, 1));
-            Intrinsics.checkNotNullExpressionValue(format, "format(...)");
-            return format;
+        // ★ 接入新结构：委托给 hazefs.SizeFormat（纯函数，已有 5 个单测覆盖）。
+        //   保留原方法签名不删 —— 有 2 处调用点，改成调用方会扩大改动面。
+        //   行为完全等价：>=1MB 用 %.1fM，<1KB 用 B，其余 %.1fK，无 GB 档。
+        return com.hazeroot.scriptrunner.hazefs.SizeFormat.format(b);
+    }
+
+    /**
+     * FsEntry → hazefs.FileEntry 适配。
+     *
+     * 重构期内两套模型并存：FsEntry 是 JADX 反编译产物（UI/adapter 依赖它），
+     * hazefs.FileEntry 是新结构的数据类（纯 Kotlin，可单测）。
+     * 只在需要复用 hazefs 纯函数时做这一次浅转换，成本是 6 个字段赋值。
+     */
+    static com.hazeroot.scriptrunner.hazefs.FileEntry toHaze(FsEntry e) {
+        if (e == null) {
+            return null;
         }
-        if (b < 1024) {
-            return b + "B";
-        }
-        String format2 = String.format("%.1fK", Arrays.copyOf(new Object[]{Float.valueOf(b / 1024.0f)}, 1));
-        Intrinsics.checkNotNullExpressionValue(format2, "format(...)");
-        return format2;
+        return new com.hazeroot.scriptrunner.hazefs.FileEntry(
+                e.getName(), e.getPath(), e.getIsDir(),
+                e.getPerm(), e.getSize(), e.getLinkTarget());
     }
 
     /* JADX INFO: Access modifiers changed from: private */

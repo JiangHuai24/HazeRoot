@@ -92,6 +92,16 @@ public final class LegacyFsReference {
      */
     public static List<FileEntry> filterAndSort(List<FileEntry> src, boolean showHidden,
                                                 boolean onlyScripts, boolean bySize) {
+        List<FileEntry> work = filterOnly(src, showHidden, onlyScripts);
+        if (work.size() >= 2) {
+            Collections.sort(work, comparator(bySize));
+        }
+        return work;
+    }
+
+    /** 只做过滤、不排序（用于和 FileFilter.apply 对比，因为 apply 本身不排序）。 */
+    public static List<FileEntry> filterOnly(List<FileEntry> src, boolean showHidden,
+                                             boolean onlyScripts) {
         List<FileEntry> work = new ArrayList<FileEntry>(src);
         for (int i = work.size() - 1; i >= 0; i--) {
             FileEntry fe = work.get(i);
@@ -109,9 +119,6 @@ public final class LegacyFsReference {
             if (drop) {
                 work.remove(i);
             }
-        }
-        if (work.size() >= 2) {
-            Collections.sort(work, comparator(bySize));
         }
         return work;
     }
