@@ -553,6 +553,19 @@ public final class Engine {
         }
     }
 
+    /**
+     * 只读 root 缓存，不做任何探测（供主线程的提示文案使用）。
+     *
+     * 与 rootAvailable() 的区别：后者在无 root 结论过期后会调 checkRoot()，
+     * 而 checkRoot 内部是 3×(waitFor 3s + 0.6s sleep) ≈ 11 秒。
+     * 在主线程上（例如 file 操作失败后弹提示）调用它会让界面冻结十几秒。
+     * 这里只返回已知结论；未知时按"可能有 root"处理，让提示走通用文案。
+     */
+    public final boolean rootKnownCached() {
+        Boolean cached = rootCache;
+        return cached != null && cached.booleanValue();
+    }
+
     public final boolean rootAvailable() {
         Boolean cached = rootCache;
         if (cached != null && cached.booleanValue()) {
@@ -794,26 +807,28 @@ public final class Engine {
                         Engine.INSTANCE.emit("state", "");
                         if (auto) {
                             str = Engine.presetTargetApp;
-                            if ((str.length() > 0) && i3 == CollectionsKt.getLastIndex(list)) {
-                                z = Engine.hadAutoInput;
-                                if (z) {
-                                    thread = ThreadsKt.thread(true, false, null, "idle-watch", -1, new Function0<Unit>() { // from class: com.hazeroot.scriptrunner.Engine$runQueue$1.1
-                                        @Override // kotlin.jvm.functions.Function0
-                                        public /* bridge */ /* synthetic */ Unit invoke() {
-                                            invoke2();
-                                            return Unit.INSTANCE;
-                                        }
-
-                                        /* renamed from: invoke, reason: avoid collision after fix types in other method */
-                                        public final void invoke2() {
-                                            Engine.INSTANCE.watchIdle();
-                                        }
-                                    });
-                                    idleWatch = thread;
-                                }
-                            }
                         }
                         Engine.INSTANCE.runOne(s, auto);
+                        // 修复「方案重放收尾静默失效」：
+                        // 原实现在 runOne() 之前读 hadAutoInput（此时恒为 false，因为它在 runOne 内部才被置 true），
+                        // 导致 idleWatch 永不创建，「静止 30s → 跳转目标 App → 退出」这条收尾从不执行。
+                        // 现在改为在 runOne 之后判断，并以「本脚本确实有录制答案」为准
+                        // （hadAutoInput 是全局状态，跨脚本会串）。
+                        if (auto && Engine.presetTargetApp.length() > 0
+                                && i3 == CollectionsKt.getLastIndex(list)
+                                && Engine.INSTANCE.hadAutoInputFor(s)) {
+                            idleWatch = ThreadsKt.thread(true, false, null, "idle-watch", -1, new Function0<Unit>() {
+                                @Override // kotlin.jvm.functions.Function0
+                                public /* bridge */ /* synthetic */ Unit invoke() {
+                                    invoke2();
+                                    return Unit.INSTANCE;
+                                }
+
+                                public final void invoke2() {
+                                    Engine.INSTANCE.watchIdle();
+                                }
+                            });
+                        }
                         if (idleWatch != null) {
                             idleWatch.interrupt();
                         }
@@ -898,6 +913,25 @@ public final class Engine {
     }
 
     /* JADX INFO: Access modifiers changed from: private */
+    /**
+     * 该脚本是否有可用于重放的录制答案。
+     * 比全局 hadAutoInput 更准确：后者在一次会话内被任一脚本置 true 就不复位，
+     * 后面的脚本即使没有录制答案也会错误触发收尾。
+     */
+    final boolean hadAutoInputFor(ScriptItem s) {
+        if (s == null) {
+            return false;
+        }
+        try {
+            java.util.List<RecordedInput> rec = s.getRecordedInputs();
+            if (rec != null && rec.size() > 0) {
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
     public final void watchIdle() {
         while (!abortFlag && !finalized) {
             try {
