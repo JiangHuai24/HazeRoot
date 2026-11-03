@@ -60,20 +60,23 @@ public final class QueueFragment$uiListener$1 implements Engine.Listener {
         switch (type.hashCode()) {
             case -979805852:
                 if (type.equals("prompt")) {
+                    // ★ 修复（跳转审计②）：prompt 自动跳终端被下面的 promptView==null 早退永久短路
+                    //   （终端控件已迁到 TerminalFragment，队列页永远没有 promptRow），
+                    //   导致「脚本要输入 → 自动跳终端」从未生效。移出早退并加当前 Tab 守卫：
+                    //   只在队列页是当前页时才跳，避免用户在别的页被强行拽走。
+                    if (payload.length() > 0 && Engine.INSTANCE.getRunningNow()) {
+                        FragmentActivity jumpAct = this$0.getActivity();
+                        MainActivity jumpMain = jumpAct instanceof MainActivity ? (MainActivity) jumpAct : null;
+                        if (jumpMain != null && jumpMain.getCurrentTabId() != R.id.navTerminal) {
+                            jumpMain.switchTo(R.id.navTerminal);
+                        }
+                    }
                     // 终端相关控件已迁到 TerminalFragment；本页无这些控件时直接跳过
                     if (this$0.promptView == null || this$0.promptRow == null) {
                         break;
                     }
                     this$0.promptView.setText(payload);
                     this$0.promptRow.setVisibility(payload.length() == 0 ? 8 : 0);
-                    if (payload.length() > 0 && Engine.INSTANCE.getRunningNow()) {
-                        // 执行中检测到提问 → 切到终端页让用户回答
-                        FragmentActivity activity = this$0.getActivity();
-                        MainActivity mainActivity = activity instanceof MainActivity ? (MainActivity) activity : null;
-                        if (mainActivity != null) {
-                            mainActivity.switchTo(R.id.navTerminal);
-                        }
-                    }
                 }
                 break;
             case 107332:

@@ -444,6 +444,11 @@ public final class MainActivity extends AppCompatActivity {
         }
     }
 
+    /** 当前 Tab 的 nav id（tabQueue/tabTerminal/...），供事件监听判断是否需要跳页 */
+    public final int getCurrentTabId() {
+        return this.currentTabId;
+    }
+
     public final QueueFragment queueFragment() {
         QueueFragment queueFragment = this.queue;
         if (queueFragment != null) {

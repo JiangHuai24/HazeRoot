@@ -1188,7 +1188,8 @@ public final class FilesFragment extends Fragment {
         int n = 0;
         for (String p : targets) {
             try {
-                enqueue(p);
+                // 跳转审计⑤：批量入队循环里只入队，切页/重置放循环外，避免 N 次页面切换
+                enqueueSilent(p);
                 n++;
             } catch (Exception ignored) {
             }
@@ -1587,6 +1588,16 @@ public final class FilesFragment extends Fragment {
         act.queueFragment().addScriptByPath(path);
         resetPickMode();
         act.switchTo(R.id.navQueue);
+    }
+
+    /** 只入队，不切页不重置多选（供批量入队循环调用；跳转审计⑤） */
+    public final void enqueueSilent(String path) {
+        FragmentActivity activity = getActivity();
+        MainActivity act = activity instanceof MainActivity ? (MainActivity) activity : null;
+        if (act == null) {
+            return;
+        }
+        act.queueFragment().addScriptByPath(path);
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -3442,7 +3453,7 @@ public final class FilesFragment extends Fragment {
             String string = getString(R.string.already_running);
             Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
             toast(string);
-            act.switchTo(R.id.navQueue);
+            act.switchTo(R.id.navTerminal);   // 跳转审计④：已有任务在跑 → 去终端看运行输出
             return;
         }
         new AlertDialog.Builder(requireContext()).setTitle(getString(R.string.run_confirm_title)).setMessage(getString(R.string.run_confirm_fmt, e.getName())).setPositiveButton(getString(R.string.run_now), new DialogInterface.OnClickListener() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda37
@@ -3464,7 +3475,7 @@ public final class FilesFragment extends Fragment {
         act.queueFragment().tryStartDirect(e.getPath());
         // 修复（R1+R2）：文件页点「执行」后自动切到队列/终端页，
         // 否则用户看不到输出与进度（原实现只 toast，停留在文件页）。
-        act.switchTo(R.id.navQueue);
+        act.switchTo(R.id.navTerminal);   // 跳转审计①：执行后去终端页看输出（原跳队列页是 bug）
     }
 
     /* JADX INFO: Access modifiers changed from: private */

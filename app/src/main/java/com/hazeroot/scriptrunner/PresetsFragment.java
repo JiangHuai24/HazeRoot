@@ -309,7 +309,7 @@ public final class PresetsFragment extends Fragment {
         FragmentActivity activity = this$0.getActivity();
         MainActivity mainActivity = activity instanceof MainActivity ? (MainActivity) activity : null;
         if (mainActivity != null) {
-            mainActivity.switchTo(R.id.navQueue);
+                    mainActivity.switchTo(R.id.navTerminal);   // 跳转审计③：方案运行 → 去终端看输出
         }
     }
 
@@ -390,7 +390,7 @@ public final class PresetsFragment extends Fragment {
                 FragmentActivity activity = PresetsFragment.this.getActivity();
                 MainActivity mainActivity = activity instanceof MainActivity ? (MainActivity) activity : null;
                 if (mainActivity != null) {
-                    mainActivity.switchTo(R.id.navQueue);
+                    mainActivity.switchTo(R.id.navTerminal);   // 跳转审计③：方案运行 → 去终端看输出
                 }
             }
         }, 2, null), new Item(string2, false, new Function0<Unit>() { // from class: com.hazeroot.scriptrunner.PresetsFragment$showPresetSheet$items$2
