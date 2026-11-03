@@ -3839,23 +3839,78 @@ public final class FilesFragment extends Fragment {
     }
 
     /* JADX INFO: Access modifiers changed from: private */
+    /* JADX INFO: Access modifiers changed from: private */
     public final void unzipTo(FsEntry src, final Pane from) {
         final String cmd;
         final String dstDir = from.getDir();
         String p = Engine.INSTANCE.q(src.getPath());
-        if (Kt.endsWith(src.getName(), ".tar.gz", false, 2, (Object) null) || Kt.endsWith(src.getName(), ".tgz", false, 2, (Object) null)) {
+        final String name = src.getName();
+        if (Kt.endsWith(name, ".tar.gz", false, 2, (Object) null) || Kt.endsWith(name, ".tgz", false, 2, (Object) null)) {
             cmd = "tar -xzf " + p + " -C " + Engine.INSTANCE.q(dstDir);
-        } else if (Kt.endsWith(src.getName(), ".tar", false, 2, (Object) null)) {
+        } else if (Kt.endsWith(name, ".tar", false, 2, (Object) null)) {
             cmd = "tar -xf " + p + " -C " + Engine.INSTANCE.q(dstDir);
         } else {
             cmd = "unzip -o " + p + " -d " + Engine.INSTANCE.q(dstDir);
         }
-        new Thread(new Runnable() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda11
+        final String srcPath = src.getPath();
+        new Thread(new Runnable() {
             @Override // java.lang.Runnable
             public final void run() {
+                // 修复「解压零校验导致越界覆盖系统目录」：
+                // 归档条目可能含 "../" 或绝对路径，tar/unzip 以 root 身份执行时会写到
+                // 目标目录之外（覆盖 /system 等系统文件）。这里先列条目做路径校验，
+                // 发现越界直接拒绝，不动文件系统。
+                if (hasUnsafeEntry(srcPath, name)) {
+                    if (FilesFragment.this.isAdded()) {
+                        FilesFragment.this.requireActivity().runOnUiThread(new Runnable() {
+                            @Override // java.lang.Runnable
+                            public final void run() {
+                                FilesFragment.this.toast("归档包含越界路径条目，已拒绝解压");
+                            }
+                        });
+                    }
+                    return;
+                }
                 FilesFragment.unzipTo$lambda$55(cmd, FilesFragment.this, from, dstDir);
             }
         }).start();
+    }
+
+    /**
+     * 检查归档内是否含越界条目（"../"、绝对路径、指向父级）。
+     * 用 tar -t / unzip -l 列出清单，逐行判断。
+     */
+    private static boolean hasUnsafeEntry(String archivePath, String name) {
+        String listCmd;
+        if (Kt.endsWith(name, ".tar.gz", false, 2, (Object) null)
+                || Kt.endsWith(name, ".tgz", false, 2, (Object) null)
+                || Kt.endsWith(name, ".tar", false, 2, (Object) null)) {
+            listCmd = "tar -tf " + Engine.INSTANCE.q(archivePath);
+        } else {
+            listCmd = "unzip -Z1 " + Engine.INSTANCE.q(archivePath);
+        }
+        String out = Engine.INSTANCE.exec(listCmd);
+        if (out == null) {
+            // 列不出清单（工具缺失或归档损坏）→ 保守放行，交由解压本身报错
+            return false;
+        }
+        for (String line : out.split("\n")) {
+            String e = line.trim();
+            if (e.length() == 0) {
+                continue;
+            }
+            // 绝对路径（/ 开头）或含 .. 段落 → 越界
+            if (e.startsWith("/")) {
+                return true;
+            }
+            String[] parts = e.split("/");
+            for (String seg : parts) {
+                if ("..".equals(seg)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /* JADX INFO: Access modifiers changed from: private */
