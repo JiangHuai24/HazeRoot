@@ -246,18 +246,22 @@ public final class Engine {
         if (len <= MAX_TERM_CHARS) {
             return;
         }
-        int cut = len - MAX_TERM_CHARS;
-        // 向后找最近的换行符；找不到就退化为从 0 开始（极端情况）
-        int nl = termBuffer.indexOf("\n", cut);
-        if (nl >= 0 && nl + 1 < len) {
-            cut = nl + 1;                       // 从下一行行首开始保留
-        } else {
-            cut = 0;                            // 无法找到行边界：整段保留，避免错位
-        }
-        if (cut > 0) {
+        int cut = com.hazeroot.scriptrunner.core.term.TermBufferTrimmer.computeCut(termBuffer, MAX_TERM_CHARS);
+        if (cut > 0 && cut < len) {
             termBuffer.delete(0, cut);
         }
     }
+
+    /**
+     * 计算应从哪个下标开始保留（可单测的纯函数）。
+     * 规则：
+     *  1. 未超上限：返回 0（不裁）
+     *  2. 目标裁剪点之后有换行符：从下一行行首开始（不切断 ANSI 标记对）
+     *  3. 找不到换行符（base64 -w0 / 进度流等无换行大输出）：硬性裁剪，
+     *     但向前回退到最近的样式标记起点，避免留下孤立标记
+     * 第 3 条是修复点：原实现在此情形下完全不裁，
+     * 使 MAX_TERM_CHARS 对无换行输出彻底失效，持续增长导致 OOM。
+     */
 
     /** 供 UI 线程安全读取当前终端缓冲（快照，避免读到中间态） */
     public final String snapshotTerm() {
