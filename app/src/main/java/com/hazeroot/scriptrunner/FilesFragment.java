@@ -1070,64 +1070,60 @@ public final class FilesFragment extends Fragment {
     }
 
     // ==================== 目录历史（后退 / 前进）====================
-    // Pane 本身没有历史栈，这里在 Fragment 侧按窗索引维护，不改动 Pane 内部结构。
-    private final java.util.List<java.util.List<String>> navHistory = new ArrayList<>();
-    private final int[] navCursor = new int[]{-1, -1};
+    // ★ 接入新结构：状态与逻辑委托给 hazefs.DirHistory（10 个单测覆盖）。
+    //   原先这里是「List<List<String>> + int[] 游标」的手写双窗历史，
+    //   现在每窗持有一个 DirHistory 实例，语义完全一致：
+    //     · 重复记录同一目录不产生新条目
+    //     · 记录新目录时截断「前进」分支
+    //     · 上限 60 条，超出删最旧
+    private final java.util.List<com.hazeroot.scriptrunner.hazefs.DirHistory> navStacks
+            = new ArrayList<>();
 
     private void ensureNavHistory() {
-        while (navHistory.size() < panes.size()) {
-            navHistory.add(new ArrayList<>());
+        while (navStacks.size() < panes.size()) {
+            navStacks.add(new com.hazeroot.scriptrunner.hazefs.DirHistory());
         }
     }
 
     /** 记录一次目录访问（由 load 成功回调调用，保证只记真实存在的目录） */
     void recordNav(String dir, int paneIdx) {
         ensureNavHistory();
-        if (paneIdx < 0 || paneIdx >= navHistory.size()) {
+        if (paneIdx < 0 || paneIdx >= navStacks.size()) {
             return;
         }
-        java.util.List<String> h = navHistory.get(paneIdx);
-        if (navCursor[paneIdx] >= 0 && navCursor[paneIdx] < h.size()
-                && Intrinsics.areEqual(h.get(navCursor[paneIdx]), dir)) {
-            return;
-        }
-        // 截断前进分支后再插入
-        while (h.size() > navCursor[paneIdx] + 1) {
-            h.remove(h.size() - 1);
-        }
-        h.add(dir);
-        navCursor[paneIdx] = h.size() - 1;
+        navStacks.get(paneIdx).record(dir);
     }
 
     private boolean navCanBack(int idx) {
         ensureNavHistory();
-        return idx >= 0 && idx < navCursor.length && navCursor[idx] > 0;
+        return idx >= 0 && idx < navStacks.size() && navStacks.get(idx).canBack();
     }
 
     private boolean navCanForward(int idx) {
         ensureNavHistory();
-        return idx >= 0 && idx < navHistory.size()
-                && navCursor[idx] < navHistory.get(idx).size() - 1;
+        return idx >= 0 && idx < navStacks.size() && navStacks.get(idx).canForward();
     }
 
     private void navBack(int idx) {
         ensureNavHistory();
-        if (!navCanBack(idx)) {
+        if (idx < 0 || idx >= navStacks.size()) {
             return;
         }
-        navCursor[idx]--;
-        Pane p = panes.get(idx);
-        p.load(navHistory.get(idx).get(navCursor[idx]), 0);
+        String target = navStacks.get(idx).back();
+        if (target != null) {
+            panes.get(idx).load(target, 0);
+        }
     }
 
     private void navForward(int idx) {
         ensureNavHistory();
-        if (!navCanForward(idx)) {
+        if (idx < 0 || idx >= navStacks.size()) {
             return;
         }
-        navCursor[idx]++;
-        Pane p = panes.get(idx);
-        p.load(navHistory.get(idx).get(navCursor[idx]), 0);
+        String target = navStacks.get(idx).forward();
+        if (target != null) {
+            panes.get(idx).load(target, 0);
+        }
     }
 
     /** 底部工具栏 5 图标绑定 */
