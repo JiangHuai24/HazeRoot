@@ -2,9 +2,9 @@
 <LinearLayout android:orientation="vertical" android:background="@color/bg_page" android:layout_width="fill_parent" android:layout_height="fill_parent"
   xmlns:android="http://schemas.android.com/apk/res/android">
     <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="4.0dip" android:paddingTop="8.0dip" android:paddingRight="6.0dip" android:paddingBottom="4.0dip" android:layout_width="fill_parent" android:layout_height="52.0dip">
-        <!-- ☰ 主菜单：导航（回队列页/终端/首页）+ 窗口 + 位置 + 显示
+        <!-- ← 返回键：直接回终端页（看输出）；导航功能并入 ⋮ 菜单 -->
              文件页隐藏了底部导航，它是唯一出口，第一项必须是「回队列页」 -->
-        <TextView android:textSize="18.0sp" android:textColor="@color/label" android:gravity="center" android:id="@id/btnFilesBack" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="44.0dip" android:layout_height="44.0dip" android:text="☰" />
+        <TextView android:textSize="18.0sp" android:textColor="@color/label" android:gravity="center" android:id="@id/btnFilesBack" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="44.0dip" android:layout_height="44.0dip" android:text="←" />
         <TextView android:textSize="18.0sp" android:textStyle="bold" android:textColor="@color/label" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_marginLeft="6.0dip" android:text="@string/files_title" android:layout_weight="1.0" />
         <TextView android:textSize="20.0sp" android:textColor="@color/accent" android:gravity="center" android:id="@id/btnNew" android:background="?selectableItemBackgroundBorderless" android:focusable="true" android:clickable="true" android:layout_width="40.0dip" android:layout_height="40.0dip" android:text="＋" />
         <!-- ⋮ 列表配置：排序 / 显示隐藏 / 只显示脚本 / 刷新 -->

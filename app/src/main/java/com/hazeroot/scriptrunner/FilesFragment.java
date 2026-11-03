@@ -209,10 +209,16 @@ public final class FilesFragment extends Fragment {
         Intrinsics.checkNotNullExpressionValue(findViewById4, "findViewById(...)");
         this.btnNew = findViewById4;
 
-        // ☰ 主菜单：导航出口（底部导航隐藏后唯一出口）+ 窗口 + 位置 + 显示
+        // ← 返回键（用户拍板）：直接回终端页看输出。
+        // 原 ☰ 主菜单冗余，导航项已并入 ⋮ 菜单；窗口/位置/显示功能保留在 ⋮ 与行面板。
         View backV = v.findViewById(R.id.btnFilesBack);
         if (backV != null) {
-            backV.setOnClickListener(view2 -> showFileMainMenu());
+            backV.setOnClickListener(view2 -> {
+                android.app.Activity act = getActivity();
+                if (act instanceof MainActivity) {
+                    ((MainActivity) act).switchTo(R.id.navTerminal);
+                }
+            });
         }
         // ⋮ 列表配置菜单
         View ovV = v.findViewById(R.id.btnOverflow);
@@ -877,87 +883,6 @@ public final class FilesFragment extends Fragment {
         }
     }
 
-    /**
-     * ☰ 主菜单。
-     * 第一项必须是「回队列页」—— 文件页隐藏了底部导航，这是唯一出口。
-     */
-    private void showFileMainMenu() {
-        if (getView() == null) {
-            return;
-        }
-        final Pane p = activePane();
-        String cur = (p != null) ? p.getDir() : "/";
-        List<GItem> items = new ArrayList<>();
-
-        // ---- 导航（必须放最前）----
-        items.add(new GItem("回队列页", false, () -> {
-            android.app.Activity act = getActivity();
-            if (act instanceof MainActivity) {
-                ((MainActivity) act).switchTo(R.id.navQueue);
-            }
-            return Unit.INSTANCE;
-        }));
-        items.add(new GItem("去终端", false, () -> {
-            android.app.Activity act = getActivity();
-            if (act instanceof MainActivity) {
-                ((MainActivity) act).switchTo(R.id.navTerminal);
-            }
-            return Unit.INSTANCE;
-        }));
-        items.add(new GItem("去首页", false, () -> {
-            android.app.Activity act = getActivity();
-            if (act instanceof MainActivity) {
-                ((MainActivity) act).switchTo(R.id.navHome);
-            }
-            return Unit.INSTANCE;
-        }));
-
-        // ---- 窗口 ----
-        items.add(new GItem("左窗的目录在右窗打开", false, () -> {
-            Pane a = panes.get(0);
-            Pane b = panes.get(1);
-            b.load(a.getDir(), 0);
-            b.setActive();
-            return Unit.INSTANCE;
-        }));
-        items.add(new GItem("交换左右窗", false, () -> {
-            Pane a = panes.get(0);
-            Pane b = panes.get(1);
-            String da = a.getDir();
-            String db = b.getDir();
-            a.load(db, 0);
-            b.load(da, 0);
-            return Unit.INSTANCE;
-        }));
-
-        // ---- 位置 ----
-        items.add(new GItem("最近访问 ›", false, () -> {
-            showRecentDirsMenu();
-            return Unit.INSTANCE;
-        }));
-        items.add(new GItem("书签 ›", false, () -> {
-            showBookmarkMenu();
-            return Unit.INSTANCE;
-        }));
-
-        // ---- 显示 ----
-        items.add(new GItem(showHidden ? "显示隐藏文件 ✓" : "显示隐藏文件", false, () -> {
-            showHidden = !showHidden;
-            saveFilePref(K_SHOW_HIDDEN, showHidden);
-            refreshAllLists();
-            toast(showHidden ? "已显示隐藏文件" : "已隐藏点文件");
-            return Unit.INSTANCE;
-        }));
-        items.add(new GItem(onlyScripts ? "只显示脚本 .sh ✓" : "只显示脚本 .sh", false, () -> {
-            onlyScripts = !onlyScripts;
-            saveFilePref(K_ONLY_SCRIPT, onlyScripts);
-            refreshAllLists();
-            toast(onlyScripts ? "只显示 .sh 脚本" : "显示全部文件");
-            return Unit.INSTANCE;
-        }));
-
-        listMenuAt("文件", null, items, getView().findViewById(R.id.btnFilesBack));
-    }
 
     /** ⋮ 列表配置菜单：排序 / 刷新 / 目录统计 */
     private void showFileOptionsMenu() {
@@ -1007,6 +932,46 @@ public final class FilesFragment extends Fragment {
             }
         }
         items.add(new GItem("文件夹 " + dirs + " · 文件 " + files, false, () -> Unit.INSTANCE));
+
+        // ---- 窗口 / 位置 / 显示（原 ☰ 主菜单并入，☰ 冗余已删）----
+        items.add(new GItem("左窗的目录在右窗打开", false, () -> {
+            Pane a = panes.get(0);
+            Pane b = panes.get(1);
+            b.load(a.getDir(), 0);
+            b.setActive();
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem("交换左右窗", false, () -> {
+            Pane a = panes.get(0);
+            Pane b = panes.get(1);
+            String da = a.getDir();
+            String db = b.getDir();
+            a.load(db, 0);
+            b.load(da, 0);
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem("最近访问 ›", false, () -> {
+            showRecentDirsMenu();
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem("书签 ›", false, () -> {
+            showBookmarkMenu();
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem(showHidden ? "显示隐藏文件 ✓" : "显示隐藏文件", false, () -> {
+            showHidden = !showHidden;
+            saveFilePref(K_SHOW_HIDDEN, showHidden);
+            refreshAllLists();
+            toast(showHidden ? "已显示隐藏文件" : "已隐藏点文件");
+            return Unit.INSTANCE;
+        }));
+        items.add(new GItem(onlyScripts ? "只显示脚本 .sh ✓" : "只显示脚本 .sh", false, () -> {
+            onlyScripts = !onlyScripts;
+            saveFilePref(K_ONLY_SCRIPT, onlyScripts);
+            refreshAllLists();
+            toast(onlyScripts ? "只显示 .sh 脚本" : "显示全部文件");
+            return Unit.INSTANCE;
+        }));
 
         listMenuAt("列表显示", p.getDir(), items, getView().findViewById(R.id.btnOverflow));
     }
@@ -2925,15 +2890,25 @@ public final class FilesFragment extends Fragment {
                     } else {
                         showMtActionPanel(item, p);
                     }
+                    longConsumed[0] = false;
+                    longFired.element = false;
+                    mode.element = 0;
+                    return true;
                 }
                 if (dragged[0]) {
                     // 拖动框选结束：保留多选态，不触发短按
                     suppressClickUntil[0] = System.currentTimeMillis() + 800L;
+                    longConsumed[0] = false;
+                    longFired.element = false;
+                    mode.element = 0;
+                    return true;
                 }
+                // ★ 长按未触发：交给 bindSwipe$lambda$39 处理左滑多选 / 普通点击 /
+                //   多选态下的点击切换（回归修复：移植框选时误删了这条路径，左滑因此失效）。
+                boolean handled = FilesFragment.bindSwipe$lambda$39(downX, downY, startTx, mode, longFired, dragAnchor, listTop, FilesFragment.this, item, mtLongPress, maxSwipe, slop, pane2, list, view2, motionEvent);
                 longConsumed[0] = false;
                 longFired.element = false;
-                mode.element = 0;
-                return true;
+                return handled;
             }
 
             private int dp40() {
