@@ -43,7 +43,7 @@
     <string name="apk_perm_msg">安装 APK 需要「安装未知应用」权限，点「去开启」后允许 HazeRoot 安装应用，再回来点一次安装包即可。</string>
     <string name="apk_perm_title">需要安装权限</string>
     <string name="apk_preparing">正在准备安装…</string>
-    <string name="app_name">HazeRoot</string>
+    <string name="app_name">HazeRoot Dev</string>
     <string name="appbar_scrolling_view_behavior">com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior</string>
     <string name="apply">应用</string>
     <string name="auto_input_fmt">>> [一键] 自动输入: %1$s</string>

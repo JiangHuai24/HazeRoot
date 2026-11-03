@@ -11,7 +11,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.hazeroot.scriptrunner"
+        applicationId = "com.hazeroot.scriptrunner.dev"
         minSdk = 26
         targetSdk = 34
         versionCode = 70
