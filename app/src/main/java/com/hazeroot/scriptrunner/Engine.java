@@ -87,9 +87,8 @@ public final class Engine {
     private static volatile String lastFullLine = "";
     private static final Object recordLock = new Object();
     private static volatile String presetTargetApp = "";
-    private static final StringBuilder termBuffer = new StringBuilder();
-    // 终端缓冲读写锁：执行线程 append、主线程 snapshot，原实现完全无同步会读到中间态
-    private static final Object TERM_LOCK = new Object();
+    // 终端缓冲已抽出到 hazefs.exec.TermBuffer（见下方 TERM 字段），
+    // 原来的 termBuffer StringBuilder 与 TERM_LOCK 已删除 —— 锁与裁剪逻辑都收进了 TermBuffer。
     // CSI 清屏/清行请求（由 feedAnsi 置位，主循环消费）
     private static volatile boolean pendingClearScreen = false;
     private static volatile boolean pendingClearLine = false;
@@ -181,15 +180,25 @@ public final class Engine {
         }
     }
 
+    /**
+     * 终端缓冲区。
+     *
+     * [D-004] 已抽出到 hazefs.exec.TermBuffer（18 个单测覆盖）。
+     * 原实现是「静态 StringBuilder + 静态 Object 锁」的一组散装方法，
+     * 与队列状态、事件总线混在同一个 1600 行的类里无法单测。
+     * 现在锁、编码约定、行边界裁剪全部收进 TermBuffer 内部。
+     */
+    private static final com.hazeroot.scriptrunner.hazefs.exec.TermBuffer TERM =
+            new com.hazeroot.scriptrunner.hazefs.exec.TermBuffer(MAX_TERM_CHARS);
+
     public final StringBuilder getTermBuffer() {
-        return termBuffer;
+        // 兼容接口：外部若需要可变缓冲，返回快照副本（避免绕过 TermBuffer 的锁）
+        return TERM.snapshotBuilder();
     }
 
     public final char ansiMark(int n) {
-        if (30 <= n && n < 38) {
-            return (char) ((n - 30) + 48);
-        }
-        return 90 <= n && n < 98 ? (char) ((n - 90) + 65) : S_ANSI_DEF;
+        // 委托 TermBuffer（其 ansiMark 与原实现逐值等价，有 0..200 全量对拍测试）
+        return TERM.ansiMark(n);
     }
 
     public final String getLastPromptText() {
@@ -206,58 +215,19 @@ public final class Engine {
     public final void log(String line, char style) {
         Intrinsics.checkNotNullParameter(line, "line");
         Log.d(TAG, "term| " + line);
-        // 修复竞态：termBuffer 在执行线程写、主线程读（syncTerm），必须同步
-        synchronized (TERM_LOCK) {
-            if (style != ' ') {
-                termBuffer.append((char) 1).append(style);
-            }
-            termBuffer.append(line).append('\n');
-            trimTermLocked();
-        }
+        // 写锁与行边界裁剪都在 TermBuffer 内部，这里不再手工 synchronized
+        TERM.append(line, style);
         emit("log", line);
     }
 
     private final void logRaw(StringBuilder raw) {
-        synchronized (TERM_LOCK) {
-            termBuffer.append((CharSequence) raw).append('\n');
-            trimTermLocked();
-        }
+        TERM.appendRaw(raw);
         emit("log", plainOf(raw));
-    }
-
-    /**
-     * 行边界裁剪（调用方必须已持有 TERM_LOCK）。
-     *
-     * 原实现按 char 数直接 delete(0, len-MAX)，裁剪点可能落在
-     * 「\u0001 + styleChar」这对 ANSI 样式标记的中间，产生孤立 \u0001，
-     * 使 QueueFragment.appendStyled 从该点开始全部错位（表现为显示不全/乱码/丢行）。
-     *
-     * 这里改为：先算出目标裁剪位置，再向后搜索到最近的 '\n' 之后裁剪，
-     * 保证永远从一个完整行的行首开始保留，绝不切断标记对。
-     */
-    private final void trimTermLocked() {
-        int len = termBuffer.length();
-        if (len <= MAX_TERM_CHARS) {
-            return;
-        }
-        int cut = len - MAX_TERM_CHARS;
-        // 向后找最近的换行符；找不到就退化为从 0 开始（极端情况）
-        int nl = termBuffer.indexOf("\n", cut);
-        if (nl >= 0 && nl + 1 < len) {
-            cut = nl + 1;                       // 从下一行行首开始保留
-        } else {
-            cut = 0;                            // 无法找到行边界：整段保留，避免错位
-        }
-        if (cut > 0) {
-            termBuffer.delete(0, cut);
-        }
     }
 
     /** 供 UI 线程安全读取当前终端缓冲（快照，避免读到中间态） */
     public final String snapshotTerm() {
-        synchronized (TERM_LOCK) {
-            return termBuffer.toString();
-        }
+        return TERM.snapshot();
     }
 
     /**
@@ -280,33 +250,17 @@ public final class Engine {
 
     /** 线程安全地判断终端缓冲是否为空 */
     public final boolean isTermEmpty() {
-        synchronized (TERM_LOCK) {
-            return termBuffer.length() == 0;
-        }
+        return TERM.isEmpty();
     }
 
     /** 线程安全地清空终端缓冲 */
     public final void clearTerm() {
-        synchronized (TERM_LOCK) {
-            termBuffer.setLength(0);
-        }
+        TERM.clear();
     }
 
     private final String plainOf(StringBuilder sb) {
-        StringBuilder b = new StringBuilder(sb.length());
-        int i = 0;
-        while (i < sb.length()) {
-            char ch = sb.charAt(i);
-            if (ch != 1 || i + 1 >= sb.length()) {
-                b.append(ch);
-                i++;
-            } else {
-                i += 2;
-            }
-        }
-        String sb2 = b.toString();
-        Intrinsics.checkNotNullExpressionValue(sb2, "toString(...)");
-        return sb2;
+        // 委托 TermBuffer.plainOf（与原实现逐字符对拍，含孤立 MARK 边界）
+        return TERM.plainOf(sb);
     }
 
     public final void init(Context ctx) {
