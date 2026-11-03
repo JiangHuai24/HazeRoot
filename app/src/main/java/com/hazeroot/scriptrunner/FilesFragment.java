@@ -1634,6 +1634,23 @@ public final class FilesFragment extends Fragment {
                     return _init_$lambda$4;
                 }
             });
+            // ★ 用户拍板：点列表空白处（无文件行）= 选中该窗格。
+            //   之前空白处点击无响应，左右窗分隔又不明显，用户点了左窗空白却激活不了左窗，
+            //   连带「推到上一级」作用在右窗上看起来像没反应。
+            listView.setOnTouchListener(new View.OnTouchListener() {
+                @Override // android.view.View.OnTouchListener
+                public boolean onTouch(View v, MotionEvent ev) {
+                    if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                        setIdxActive();
+                    }
+                    return false;   // 不消费，继续走正常的点击/滚动
+                }
+            });
+        }
+
+        /** 把本窗格设为活动窗格（供空白点击选中用） */
+        void setIdxActive() {
+            setActive();
         }
 
         public final int getIdx() {
@@ -1839,7 +1856,11 @@ public final class FilesFragment extends Fragment {
                 return;
             }
             // [D-002] 接入 hazefs.PathUtil：取父目录（已在根返回 "/"）
+            // ★ 修复「点上一级没反应」：接线时只算了 parent 却丢了 load() 调用。
+            //   先激活本窗格再跳转，保证用户点哪个窗的 ‹ 就切哪个窗、跳它的父目录。
+            setActive();
             String parent = com.hazeroot.scriptrunner.hazefs.PathUtil.parent(this.dir);
+            load(parent, 0);
         }
 
         public final void setHome() {
