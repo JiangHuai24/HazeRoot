@@ -2863,8 +2863,10 @@ public final class FilesFragment extends Fragment {
         final Runnable mtLongPress = new Runnable() {
             @Override
             public void run() {
-                longConsumed[0] = true;
-                // 屏蔽 800ms 内的 onItemClick —— 覆盖「长按抬起」这一刻
+                // 长按成立：只置标记 + 触感反馈，
+                // 面板改为在「抬起且未拖动」时弹出，这样长按后拖动才能进入框选。
+                longFired.element = true;
+                // 先屏蔽点击，避免长按成立后抬起又被判成短按
                 suppressClickUntil[0] = System.currentTimeMillis() + 800L;
                 Pane p = paneOfRow(FilesFragment.this, fg);
                 p.setActive();
@@ -2872,48 +2874,106 @@ public final class FilesFragment extends Fragment {
                     fg.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
                 } catch (Exception ignored) {
                 }
-                // ★ 按 MT 录屏：多选态下长按「已选中」的行 → 弹批量操作面板
-                if (multiMode && selPane == p && selected.contains(item.getPath()) && selected.size() > 1) {
-                    showMtBatchPanel(p);
-                } else {
-                    showMtActionPanel(item, p);
-                }
             }
         };
         // 把屏蔽时间戳挂到 Fragment 上，供 onItemClick 读取
         this.mtSuppressClickUntil = suppressClickUntil;
+        // 判断本次手势是否已进入框选（mode==2 表示拖动多选）
+        final boolean[] dragged = new boolean[]{false};
         fg.setOnTouchListener(new View.OnTouchListener() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda43
             @Override // android.view.View.OnTouchListener
             public final boolean onTouch(View view2, MotionEvent motionEvent) {
                 int act = motionEvent.getActionMasked();
                 if (act == MotionEvent.ACTION_DOWN) {
-                    longConsumed[0] = false;     // 新手势开始，重置标记
+                    longConsumed[0] = false;
+                    dragged[0] = false;
+                    longFired.element = false;
                     downX.element = motionEvent.getX();
                     downY.element = motionEvent.getY();
+                    startTx.element = view2.getTranslationX();
+                    mode.element = 0;
+                    dragAnchor.element = -1;
+                    // 记录列表屏幕 Y 偏移，拖动框选时把原始坐标换算成列表内坐标
+                    Pane d0 = paneOfRow(FilesFragment.this, view2);
+                    int[] loc0 = new int[2];
+                    d0.getList().getLocationOnScreen(loc0);
+                    listTop.element = loc0[1];
                     view2.removeCallbacks(mtLongPress);
                     view2.postDelayed(mtLongPress, 600L);
                     return true;
                 }
-                if (longConsumed[0]) {
-                    // ★ 长按已触发：抬起/移动都不再走短按逻辑，
-                    //   否则会「长按弹面板的同时又触发一次短按执行询问」。
-                    view2.removeCallbacks(mtLongPress);
-                    if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) {
-                        longConsumed[0] = false;
-                    }
-                    return true;
-                }
+
                 if (act == MotionEvent.ACTION_MOVE) {
                     float mx = Math.abs(motionEvent.getX() - downX.element);
                     float my = Math.abs(motionEvent.getY() - downY.element);
-                    if (mx > slop || my > slop) {
-                        view2.removeCallbacks(mtLongPress);
+                    if (!longFired.element) {
+                        if (mx > slop || my > slop) {
+                            view2.removeCallbacks(mtLongPress);
+                        }
+                    } else if (mx > slop || my > slop) {
+                        // 长按已成立 + 有位移 → 进入框选（mode 走 2），并标记已拖动
+                        dragged[0] = true;
+                        if (mode.element == 0) {
+                            mode.element = 2;
+                            Pane dp = paneOfRow(FilesFragment.this, view2);
+                            dp.setActive();
+                            if (!multiMode || selPane != dp) {
+                                enterMulti(dp);
+                            }
+                            ListView dl = dp.getList();
+                            dragAnchor.element = dl.getPositionForView(view2);
+                            selectRange(dp, dragAnchor.element, dragAnchor.element);
+                            showMultiBar();
+                            dp.refreshSel();
+                        } else {
+                            Pane dp = paneOfRow(FilesFragment.this, view2);
+                            int y = (int) (motionEvent.getRawY() - listTop.element);
+                            ListView ml = dp.getList();
+                            int pos = ml.pointToPosition(ml.getWidth() / 2, y);
+                            if (pos >= 0) {
+                                selectRange(dp, dragAnchor.element, pos);
+                            }
+                            if (y < dp40()) {
+                                ml.smoothScrollBy(-dp36(), 0);
+                            } else if (y > ml.getHeight() - dp40()) {
+                                ml.smoothScrollBy(dp36(), 0);
+                            }
+                        }
+                        return true;
                     }
-                } else {
-                    view2.removeCallbacks(mtLongPress);
+                    return true;
                 }
-                boolean handled = FilesFragment.bindSwipe$lambda$39(downX, downY, startTx, mode, longFired, dragAnchor, listTop, FilesFragment.this, item, mtLongPress, maxSwipe, slop, pane2, list, view2, motionEvent);
-                return handled;
+
+                // 抬起/取消
+                view2.removeCallbacks(mtLongPress);
+                if (longFired.element && !dragged[0]) {
+                    // 长按成立但没有拖动 → 弹操作面板（原有行为）
+                    longConsumed[0] = true;
+                    suppressClickUntil[0] = System.currentTimeMillis() + 800L;
+                    Pane p = paneOfRow(FilesFragment.this, view2);
+                    p.setActive();
+                    if (multiMode && selPane == p && selected.contains(item.getPath()) && selected.size() > 1) {
+                        showMtBatchPanel(p);
+                    } else {
+                        showMtActionPanel(item, p);
+                    }
+                }
+                if (dragged[0]) {
+                    // 拖动框选结束：保留多选态，不触发短按
+                    suppressClickUntil[0] = System.currentTimeMillis() + 800L;
+                }
+                longConsumed[0] = false;
+                longFired.element = false;
+                mode.element = 0;
+                return true;
+            }
+
+            private int dp40() {
+                return FilesFragment.this.dp(40);
+            }
+
+            private int dp36() {
+                return FilesFragment.this.dp(36);
             }
         });
         ((TextView) view.findViewById(R.id.fbEnqueue)).setOnClickListener(new View.OnClickListener() { // from class: com.hazeroot.scriptrunner.FilesFragment$$ExternalSyntheticLambda44
