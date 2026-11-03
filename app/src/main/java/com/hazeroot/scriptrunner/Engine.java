@@ -499,6 +499,53 @@ public final class Engine {
         }
     }
 
+    /**
+     * 带超时的进程输出读取（自 fix/slow-repair 移植）。
+     * 读流放独立 daemon 线程，主流程 waitFor(超时) 兜底，超时 destroy 进程。
+     */
+    private static String readWithTimeout(java.lang.Process p, long timeoutMs) {
+        String[] holder = new String[1];
+        Thread reader = new Thread(() -> {
+            try {
+                holder[0] = new String(ByteStreamsKt.readBytes(p.getInputStream()), Charsets.UTF_8);
+            } catch (Exception e) {
+                Log.d(TAG, "读流异常: " + e);
+            }
+        }, "proc-reader");
+        reader.setDaemon(true);
+        reader.start();
+        boolean finished = false;
+        try {
+            finished = p.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            Log.d(TAG, "waitFor 异常: " + e);
+        }
+        if (!finished) {
+            Log.d(TAG, "命令超时(" + timeoutMs + "ms)，强制结束进程");
+            try {
+                p.destroy();
+            } catch (Exception ignored) {
+            }
+            return null;
+        }
+        try {
+            reader.join(2000L);
+        } catch (Exception ignored) {
+        }
+        return (p.exitValue() == 0) ? holder[0] : null;
+    }
+
+    private static final long EXEC_TIMEOUT_MS = 60000L;
+
+    /**
+     * 只读 root 缓存，不做任何探测（供主线程的提示文案使用）。
+     * rootAvailable() 在无 root 结论过期后会走 3×(3s+0.6s) 探测，主线程调用会冻结界面。
+     */
+    public final boolean rootKnownCached() {
+        Boolean cached = rootCache;
+        return cached != null && cached.booleanValue();
+    }
+
     public final boolean rootAvailable() {
         Boolean cached = rootCache;
         if (cached != null && cached.booleanValue()) {
@@ -934,8 +981,8 @@ public final class Engine {
             java.lang.Process pre = new ProcessBuilder("su", "-c",
                     "test -f " + q(s.getPath()) + " && head -c 4 " + q(s.getPath()) + " | od -An -tx1")
                     .redirectErrorStream(true).start();
-            probeOut = new String(ByteStreamsKt.readBytes(pre.getInputStream()), Charsets.UTF_8);
-            fileOk = pre.waitFor() == 0;
+            probeOut = readWithTimeout(pre, 15000L);
+            fileOk = probeOut != null;
         } catch (Exception e) {
             probeOut = "";
             fileOk = false;
@@ -980,15 +1027,17 @@ public final class Engine {
                 java.lang.Process sbp = new ProcessBuilder("su", "-c",
                         "head -n 1 " + q(scriptPath) + " 2>/dev/null")
                         .redirectErrorStream(true).start();
-                String first = new String(ByteStreamsKt.readBytes(sbp.getInputStream()), Charsets.UTF_8);
-                sbp.waitFor();
+                String first = readWithTimeout(sbp, 15000L);
+                if (first == null) {
+                    first = "";
+                }
                 first = first.trim();
                 if (first.startsWith("#!")) {
                     // 形如 "#!/system/bin/sh" 或 "#!/usr/bin/env python3"
                     shebang = first.substring(2).trim();
                 }
-            } catch (Exception ignored) {
-            }
+                } catch (Exception ignored) {
+                }
             if (shebang.length() > 0) {
                 // 有 shebang：交给系统按首行解释器执行（等价 `exec path`，内核读 shebang）
                 inner = "chmod +x " + q(scriptPath) + " 2>/dev/null; " + q(scriptPath);
@@ -1224,8 +1273,17 @@ public final class Engine {
         }
 
         // ---- 5. 收尾：取退出码并落盘 ----
+        // ★ 修复「停止后执行键永久禁用」（自 fix/slow-repair 移植）：脚本忽略 TERM 时
+        //   waitFor 永久阻塞 → RUNNING_GATE 永不释放。给收尾一个有限等待 + 强杀兜底。
         try {
-            waitCode = proc.waitFor();
+            if (!proc.waitFor(3000L, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                Log.d(TAG, "收尾等待超时，强制结束进程");
+                try {
+                    proc.destroyForcibly();
+                } catch (Exception ignored) {
+                }
+            }
+            waitCode = proc.exitValue();
         } catch (Exception e) {
             waitCode = -1;
         }
@@ -1234,11 +1292,6 @@ public final class Engine {
         synchronized (recordLock) {
             collect = recordingCollect;
             if (collect != null) {
-                // 修复「录制→重放」闭环断裂：
-                // 把 recordingCollect(Map<prompt, List<value>>) 展开为扁平 List<RecordedInput>，
-                // 写回 ScriptItem.recordedInputs，再落盘。此前这里只 saveScripts，
-                // 但 recordedInputs 字段从未被 setRecordedInputs 写回，导致存方案时 rec 恒为空，
-                // 重放时一个答案都不会回。
                 List<RecordedInput> recorded = new ArrayList<>();
                 for (Map.Entry<String, List<String>> en : collect.entrySet()) {
                     String prompt = en.getKey();
