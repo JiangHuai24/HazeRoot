@@ -324,7 +324,24 @@ public final class EditorActivity extends AppCompatActivity {
             Intrinsics.throwUninitializedPropertyAccessException("path");
             str2 = null;
         }
-        final byte[] execBytes = engine.execBytes("cat " + engine2.q(str2));
+        // ★ 修复「打开大文件 OOM 闪退」（自 fix/slow-repair 移植）：
+        //   原实现直接 cat 整个文件进堆，之后才判断 512KB 截断 —— 大文件已经 OOM。
+        //   先 stat 取真实大小，超限就 head -c 只读前 512KB，堆占用有硬上限。
+        String realPath = str2;
+        long fileSize = -1L;
+        String statOut = Engine.INSTANCE.exec("stat -c %s " + Engine.INSTANCE.q(realPath));
+        if (statOut != null) {
+            try {
+                fileSize = Long.parseLong(StringsKt.trim((CharSequence) statOut).toString());
+            } catch (Exception ignored) {
+            }
+        }
+        final long HARD_LIMIT = 524288L;
+        boolean oversized = fileSize > HARD_LIMIT;
+        String readCmd = oversized
+                ? "head -c " + HARD_LIMIT + " " + Engine.INSTANCE.q(realPath)
+                : "cat " + Engine.INSTANCE.q(realPath);
+        final byte[] execBytes = engine.execBytes(readCmd);
         if (execBytes == null) {
             this$0.runOnUiThread(new Runnable() { // from class: com.hazeroot.scriptrunner.EditorActivity$$ExternalSyntheticLambda1
                 @Override // java.lang.Runnable
@@ -334,7 +351,11 @@ public final class EditorActivity extends AppCompatActivity {
             });
             return;
         }
-        this$0.fileBytes = execBytes.length;
+        // fileBytes 记录真实大小供界面显示
+        this$0.fileBytes = (fileSize >= 0) ? fileSize : execBytes.length;
+        if (oversized) {
+            this$0.previewNote = "文件较大，仅预览前 512KB";
+        }
         final boolean isBinary = this$0.isBinary(execBytes);
         long j = isBinary ? 65536L : 524288L;
         this$0.readOnly = isBinary || ((long) execBytes.length) > j;
@@ -596,78 +617,74 @@ public final class EditorActivity extends AppCompatActivity {
         if (this.readOnly) {
             return;
         }
-        EditText editText = this.edText;
-        EditText editText2 = null;
-        if (editText == null) {
+        EditText et = this.edText;
+        if (et == null) {
             Intrinsics.throwUninitializedPropertyAccessException("edText");
-            editText = null;
+            et = null;
         }
-        byte[] bytes = editText.getText().toString().getBytes(this.charset);
+        final byte[] bytes = et.getText().toString().getBytes(this.charset);
         Intrinsics.checkNotNullExpressionValue(bytes, "getBytes(...)");
-        File tmp = new File(getCacheDir(), "editor_tmp");
-        try {
-            FilesKt.writeBytes(tmp, bytes);
-            Engine engine = Engine.INSTANCE;
-            Engine engine2 = Engine.INSTANCE;
-            String absolutePath = tmp.getAbsolutePath();
-            Intrinsics.checkNotNullExpressionValue(absolutePath, "getAbsolutePath(...)");
-            String q = engine2.q(absolutePath);
-            Engine engine3 = Engine.INSTANCE;
-            String str = this.path;
-            if (str == null) {
-                Intrinsics.throwUninitializedPropertyAccessException("path");
-                str = null;
-            }
-            String r = engine.exec("cp " + q + " " + engine3.q(str));
-            tmp.delete();
-            if (r == null) {
-                String string = getString(R.string.save_fail);
-                Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
-                Ui.INSTANCE.toast(this, string);
-                return;
-            }
-            Engine engine4 = Engine.INSTANCE;
-            Engine engine5 = Engine.INSTANCE;
-            String str2 = this.path;
-            if (str2 == null) {
-                Intrinsics.throwUninitializedPropertyAccessException("path");
-                str2 = null;
-            }
-            String exec = engine4.exec("wc -c < " + engine5.q(str2));
-            String verify = exec != null ? StringsKt.trim((CharSequence) exec).toString() : null;
-            if (!Intrinsics.areEqual(verify, String.valueOf(bytes.length))) {
-                String string2 = getString(R.string.verify_fail);
-                Intrinsics.checkNotNullExpressionValue(string2, "getString(...)");
-                Ui.INSTANCE.toast(this, string2);
-                return;
-            }
-            EditText editText3 = this.edText;
-            if (editText3 == null) {
-                Intrinsics.throwUninitializedPropertyAccessException("edText");
-            } else {
-                editText2 = editText3;
-            }
-            this.savedText = editText2.getText().toString();
-            this.fileBytes = bytes.length;
-            this.dirty = false;
-            refreshStatus();
-            String string3 = getString(R.string.saved_fmt, new Object[]{this.charset.name()});
-            Intrinsics.checkNotNullExpressionValue(string3, "getString(...)");
-            Ui.INSTANCE.toast(this, string3);
-        } catch (Exception e) {
-            Ui ui = Ui.INSTANCE;
-            EditorActivity editorActivity = this;
-            int i = R.string.tmp_fail_fmt;
-            Object[] objArr = new Object[1];
-            String message = e.getMessage();
-            if (message == null) {
-                message = "";
-            }
-            objArr[0] = message;
-            String string4 = getString(i, objArr);
-            Intrinsics.checkNotNullExpressionValue(string4, "getString(...)");
-            ui.toast(editorActivity, string4);
+        final String targetPath = this.path;
+        if (targetPath == null) {
+            Intrinsics.throwUninitializedPropertyAccessException("path");
+            return;
         }
+
+        // ★ 修复「保存必 ANR」（自 fix/slow-repair 移植）：
+        //   原实现在主线程串行跑两次 Engine.exec("cp"/"wc -c")，
+        //   而 Engine.su 是 SU_LOCK 串行 + 3×60s 重试 + 350ms sleep，
+        //   su 授权弹窗未响应时编辑页最长冻结数分钟。
+        //   现在：落盘 + 写入 + 校验全部移出主线程，cp 与 wc 合并成一条 sh -c 只走一次 su。
+        Ui.INSTANCE.toast(this, getString(R.string.saving));
+        new Thread(new Runnable() {
+            @Override // java.lang.Runnable
+            public final void run() {
+                String failMsg = null;
+                String charsetName = charset.name();
+                try {
+                    File tmp = new File(getCacheDir(), "editor_tmp");
+                    FilesKt.writeBytes(tmp, bytes);
+                    String q = Engine.INSTANCE.q(tmp.getAbsolutePath());
+                    String dst = Engine.INSTANCE.q(targetPath);
+                    String merged = "cp " + q + " " + dst + " && wc -c < " + dst;
+                    String out = Engine.INSTANCE.exec(merged);
+                    tmp.delete();
+                    if (out == null) {
+                        failMsg = getString(R.string.save_fail);
+                    } else {
+                        String verify = StringsKt.trim((CharSequence) out).toString();
+                        if (!verify.equals(String.valueOf(bytes.length))) {
+                            failMsg = getString(R.string.verify_fail);
+                        }
+                    }
+                } catch (Exception e) {
+                    String message = e.getMessage();
+                    failMsg = getString(R.string.tmp_fail_fmt, message == null ? "" : message);
+                }
+                final String err = failMsg;
+                final String cs = charsetName;
+                runOnUiThread(new Runnable() {
+                    @Override // java.lang.Runnable
+                    public final void run() {
+                        if (isFinishing() || isDestroyed()) {
+                            return;
+                        }
+                        if (err != null) {
+                            Ui.INSTANCE.toast(EditorActivity.this, err);
+                            return;
+                        }
+                        EditText cur = edText;
+                        if (cur != null) {
+                            savedText = cur.getText().toString();
+                        }
+                        fileBytes = bytes.length;
+                        dirty = false;
+                        refreshStatus();
+                        Ui.INSTANCE.toast(EditorActivity.this, getString(R.string.saved_fmt, new Object[]{cs}));
+                    }
+                });
+            }
+        }).start();
     }
 
     @Override // androidx.activity.ComponentActivity, android.app.Activity

@@ -489,4 +489,5 @@ su 可用，但未识别出管理器应用（可能已隐藏）。"</string>
     <string name="bookmark_added">添加书签成功</string>
     <string name="sw_multi">多选</string>
     <string name="multi_select_none">取消全选</string>
+    <string name="saving">保存中…</string>
 </resources>
