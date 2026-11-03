@@ -1052,8 +1052,8 @@ public final class Engine {
             java.lang.Process pre = new ProcessBuilder("su", "-c",
                     "test -f " + q(s.getPath()) + " && head -c 4 " + q(s.getPath()) + " | od -An -tx1")
                     .redirectErrorStream(true).start();
-            probeOut = new String(ByteStreamsKt.readBytes(pre.getInputStream()), Charsets.UTF_8);
-            fileOk = pre.waitFor() == 0;
+            probeOut = readWithTimeout(pre, 15000L);
+            fileOk = probeOut != null;
         } catch (Exception e) {
             probeOut = "";
             fileOk = false;
@@ -1098,15 +1098,17 @@ public final class Engine {
                 java.lang.Process sbp = new ProcessBuilder("su", "-c",
                         "head -n 1 " + q(scriptPath) + " 2>/dev/null")
                         .redirectErrorStream(true).start();
-                String first = new String(ByteStreamsKt.readBytes(sbp.getInputStream()), Charsets.UTF_8);
-                sbp.waitFor();
+                String first = readWithTimeout(sbp, 15000L);
+                if (first == null) {
+                    first = "";
+                }
                 first = first.trim();
                 if (first.startsWith("#!")) {
                     // 形如 "#!/system/bin/sh" 或 "#!/usr/bin/env python3"
                     shebang = first.substring(2).trim();
                 }
-            } catch (Exception ignored) {
-            }
+                } catch (Exception ignored) {
+                }
             if (shebang.length() > 0) {
                 // 有 shebang：交给系统按首行解释器执行（等价 `exec path`，内核读 shebang）
                 inner = "chmod +x " + q(scriptPath) + " 2>/dev/null; " + q(scriptPath);
@@ -1360,8 +1362,21 @@ public final class Engine {
         }
 
         // ---- 5. 收尾：取退出码并落盘 ----
+        // ★ 修复「停止后执行键永久禁用、只能杀进程重启」：
+        //   原实现是无超时的 proc.waitFor()。点停止后若内层脚本忽略 TERM
+        //   （例如脚本自己 trap 了信号、或 fork 出的子进程仍占用 stdout），
+        //   这里会永久阻塞 → runOne 永不返回 → RUNNING_GATE / runningNow 永不释放
+        //   → 执行键一直是禁用态，点执行毫无反应。
+        //   现在给收尾一个有限等待，超时就 destroyForcibly 兜底。
         try {
-            waitCode = proc.waitFor();
+            if (!proc.waitFor(3000L, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                Log.d(TAG, "收尾等待超时，强制结束进程");
+                try {
+                    proc.destroyForcibly();
+                } catch (Exception ignored) {
+                }
+            }
+            waitCode = proc.exitValue();
         } catch (Exception e) {
             waitCode = -1;
         }
