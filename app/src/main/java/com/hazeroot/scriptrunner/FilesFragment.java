@@ -38,7 +38,6 @@ import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import com.hazeroot.scriptrunner.FilesFragment;
-import com.hazeroot.scriptrunner.core.fs.PathUtil;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1067,10 +1066,10 @@ public final class FilesFragment extends Fragment {
     // ==================== 目录历史（后退 / 前进）====================
     // ★ 接入新结构：状态与逻辑委托给 hazefs.DirHistory（10 个单测覆盖）。
     //   原先这里是「List<List<String>> + int[] 游标」的手写双窗历史，
-    //   现在每窗持有一个 DirHistory 实例，语义完全一致：
+    //   现在每窗持有一个 hazefs.DirHistory 实例。语义差异（有意为之，非等价替换）：
     //     · 重复记录同一目录不产生新条目
     //     · 记录新目录时截断「前进」分支
-    //     · 上限 60 条，超出删最旧
+    //     · **新增上限 60 条**，超出淘汰最旧的非根条目（根目录永久保留；原实现无上限）
     private final java.util.List<com.hazeroot.scriptrunner.hazefs.DirHistory> navStacks
             = new ArrayList<>();
 
@@ -1944,14 +1943,15 @@ public final class FilesFragment extends Fragment {
                 err = err4;
             }
             if (out != null) {
-                // ★ 接入新结构：解析交给 hazefs.LsParser（17 个单测覆盖，含真机样本）。
+                // ★ 接入新结构：解析交给 hazefs.LsParser（含真机样本与边界用例的单测覆盖）。
                 //   这段原本是 JADX 还原的 while+goto 循环（用了 i2/i3/str/line 等
-                //   编译器临时变量），替换后行为完全等价：
-                //     · 正则同一条
-                //     · "." / ".." / 空名丢弃
-                //     · " -> " 拆软链目标
-                //     · 目录取自权限首位 'd'
-                //     · 大小解析失败按 0
+                //   编译器临时变量）。行为对齐说明：
+                //     · 正则**已增强** —— 新增设备文件 `8, 0` 与 ACL `+` / SELinux `.` 支持
+                //       （原正则这两种行整行 MISS，用户进 /dev 会看到空目录）
+                //     · "." / ".." / 空名丢弃（与原实现一致）
+                //     · " -> " 拆软链目标（与原实现一致）
+                //     · 目录取自权限首位 'd'（与原实现一致）
+                //     · 大小解析失败按 0（与原实现一致；设备文件恒为 0）
                 for (com.hazeroot.scriptrunner.hazefs.FileEntry he
                         : com.hazeroot.scriptrunner.hazefs.LsParser.parse(out, newDir)) {
                     parsed.add(new FsEntry(he.getName(), he.getPath(), he.isDir(),
@@ -4088,14 +4088,11 @@ public final class FilesFragment extends Fragment {
 
     /* JADX INFO: Access modifiers changed from: private */
     public final boolean isApkFile(String n) {
-        // ★ 保留原正则语义：可匹配 base.apk / base.apk1 / base.apk.1 等形式
-        //   （apk 后面可能跟数字后缀，这是 Android 应用目录里常见的命名）。
-        //   PathUtil.isApk 只判断 .apk 结尾，覆盖不到这些，故此处保留原正则。
-        if (n == null) {
-            return false;
-        }
-        return java.util.regex.Pattern.compile(".*\\.?apk(\\.\\d+)?")
-                .matcher(n.toLowerCase(Locale.ROOT)).matches();
+        // ★ 接入新结构：委托 hazefs.PathUtil.isApk。
+        //   它覆盖 base.apk / base.apk1 / base.apk.1 三种真实命名形态
+        //   （原内联正则 `.*\.?apk(\.\d+)?` 的 `\.?` 是可选，
+        //    导致 apk 后直接跟数字的 base.apk1 匹配不上，此缺陷已在新实现修正）。
+        return com.hazeroot.scriptrunner.hazefs.PathUtil.isApk(n);
     }
     /* JADX INFO: Access modifiers changed from: private */
     public final void installApk(final FsEntry e) {

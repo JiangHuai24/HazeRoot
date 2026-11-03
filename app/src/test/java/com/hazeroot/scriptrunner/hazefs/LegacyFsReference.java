@@ -1,4 +1,4 @@
-package com.hazeroot.scriptrunner.core.fs;
+package com.hazeroot.scriptrunner.hazefs;
 
 import java.util.ArrayList;
 import java.util.Collections;
