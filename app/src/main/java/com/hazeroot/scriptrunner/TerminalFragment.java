@@ -356,13 +356,15 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
         if (termView == null || termScroll == null) {
             return;
         }
-        String buf = Engine.INSTANCE.snapshotTerm();
+        // 性能优化（自 fix/slow-repair 移植）：只取长度判断增量，不再每条 log 全量 snapshot()。
+        // 长输出（20 万字符上限）时原来是 O(n²)；现在只复制 [renderedChars, len) 一小段。
+        int len = Engine.INSTANCE.termLength();
         Editable dst = termView.getEditableText();
         if (dst == null) {
             return;
         }
         // buffer 为空 → 显示欢迎语（版本 + 队列状态 + 操作提示），不留空白
-        if (buf.length() == 0) {
+        if (len == 0) {
             if (renderedChars != -1) {
                 dst.clear();
                 dst.append(Engine.INSTANCE.welcomeText());
@@ -375,18 +377,22 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
             dst.clear();
             renderedChars = 0;
         }
-        if (buf.length() < renderedChars) {
+        // 缓冲被裁剪（或清空重建）→ 游标失效，整体重绘
+        if (len < renderedChars) {
             renderedChars = 0;
             dst.clear();
         }
-        if (buf.length() > renderedChars) {
+        if (len > renderedChars) {
             boolean initial = renderedChars == 0;
             boolean atBottom = !termScroll.canScrollVertically(1);
             if (initial) {
                 dst.clear();
             }
-            appendStyled(dst, buf.substring(renderedChars));
-            renderedChars = buf.length();
+            String chunk = Engine.INSTANCE.termSlice(renderedChars, len);
+            if (chunk.length() > 0) {
+                appendStyled(dst, chunk);
+            }
+            renderedChars = len;
             if (initial || atBottom) {
                 termScroll.post(() -> termScroll.fullScroll(View.FOCUS_DOWN));
             }

@@ -68,15 +68,35 @@ class TermBuffer(private val maxChars: Int = DEFAULT_MAX) {
      * （表现为显示不全 / 乱码 / 丢行）。
      *
      * 做法：算出目标位置后向后找最近的 `\n`，从下一行行首开始保留。
+     *
+     * ★ 修复「无换行大输出上限失效」（自 fix/slow-repair 移植）：
+     *   原实现找不到 `\n` 时 cut=0 整段保留，base64 -w0 / \r 进度流这类
+     *   无换行输出会持续增长，maxChars 完全不起作用 → OOM。
+     *   现在硬性兜底：向前回退到最近的样式标记起点（\u0001）再裁，
+     *   宁可丢一个标记对，也不让内存突破上限。
      */
     private fun trimLocked() {
         val len = sb.length
         if (len <= maxChars) return
 
-        val cutTarget = len - maxChars
-        val nl = sb.indexOf("\n", cutTarget)
-        val cut = if (nl >= 0 && nl + 1 < len) nl + 1 else 0
-        if (cut > 0) {
+        var cut = len - maxChars
+        val nl = sb.indexOf("\n", cut)
+        if (nl >= 0 && nl + 1 < len) {
+            cut = nl + 1
+        } else {
+            // 无换行：向前最多回退 8 字符找样式标记起点，避免孤立标记
+            var mark = cut
+            var i = cut
+            while (i >= 0 && i > cut - 9) {
+                if (sb[i] == '\u0001') {
+                    mark = i
+                    break
+                }
+                i--
+            }
+            cut = if (mark > 0) mark else cut
+        }
+        if (cut > 0 && cut < len) {
             sb.delete(0, cut)
         }
     }
@@ -98,6 +118,18 @@ class TermBuffer(private val maxChars: Int = DEFAULT_MAX) {
     /** 当前字符数 */
     @Synchronized
     fun length(): Int = sb.length
+
+    /**
+     * 只取 [from, to) 区间的增量片段（自 fix/slow-repair 移植）。
+     * UI 渲染走这个方法：每条 log 只复制新增的一小段，
+     * 避免全量 snapshot() 在 20 万字符缓冲下的 O(n²)。
+     */
+    @Synchronized
+    fun slice(from: Int, to: Int): String {
+        val f = from.coerceAtLeast(0)
+        val t = to.coerceAtMost(sb.length)
+        return if (t <= f) "" else sb.substring(f, t)
+    }
 
     // ---------------- 清空 ----------------
 

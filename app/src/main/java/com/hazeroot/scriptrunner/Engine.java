@@ -230,6 +230,16 @@ public final class Engine {
         return TERM.snapshot();
     }
 
+    /** 当前终端缓冲长度（自 fix/slow-repair 移植：避免为判断增量而全量复制） */
+    public final int termLength() {
+        return TERM.length();
+    }
+
+    /** 只取 [from, to) 增量片段（自 fix/slow-repair 移植，消除 20 万字符下的 O(n²)） */
+    public final String termSlice(int from, int to) {
+        return TERM.slice(from, to);
+    }
+
     /**
      * 终端欢迎语（终端页首次打开或清空后显示）。
      * 内容：版本 + 当前队列状态 + 一句操作提示。
