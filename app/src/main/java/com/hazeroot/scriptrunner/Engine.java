@@ -74,6 +74,13 @@ public final class Engine {
     // KernelSU 在高并发下会拒绝/超时，表现为"Root Active 但命令失败"。
     // 所有 su 调用串行化，稳定优先（每次 su 仅几十毫秒）。
     private static final Object SU_LOCK = new Object();
+
+    /**
+     * 单条 shell 命令的超时上限。
+     * ls / cp / mv / rm / chmod 都是秒级；给大文件 tar 留足余量。
+     * 超过此值视为卡死，强制 destroy 进程并返回 null（调用方按失败处理）。
+     */
+    private static final long EXEC_TIMEOUT_MS = 60000L;
     private static volatile boolean runningNow;
     // 执行门禁：compareAndSet 原子化，防止 runQueue 被并发调用导致双队列同时执行
     private static final java.util.concurrent.atomic.AtomicBoolean RUNNING_GATE =
@@ -518,13 +525,11 @@ public final class Engine {
                 // 后续命令会降回 shell(uid 2000)，导致 cp/tar 等以非 root 身份执行。
                 // 用 sh -c 显式包裹，保证整条复合命令在同一个 root shell 内运行。
                 p = new ProcessBuilder("su", "-c", "sh -c " + q(cmd)).redirectErrorStream(true).start();
-                InputStream inputStream = p.getInputStream();
-                Intrinsics.checkNotNullExpressionValue(inputStream, "getInputStream(...)");
-                String out = new String(ByteStreamsKt.readBytes(inputStream), Charsets.UTF_8);
-                if (p.waitFor() == 0) {
+                String out = readWithTimeout(p, EXEC_TIMEOUT_MS);
+                if (out != null) {
                     return out;
                 }
-                Log.d(TAG, "su 第 " + (attempt + 1) + " 次失败，cmd=" + cmd + " out=" + out);
+                Log.d(TAG, "su 第 " + (attempt + 1) + " 次失败/超时，cmd=" + cmd);
             } catch (Exception e) {
                 Log.d(TAG, "su 第 " + (attempt + 1) + " 次异常，cmd=" + cmd + " err=" + e);
             } finally {
@@ -561,6 +566,88 @@ public final class Engine {
         return checkRoot();
     }
 
+    /**
+     * 带超时的进程输出读取（字节版，供 execBytes 使用）。
+     * 与 readWithTimeout 同构，只是返回原始字节，用于读取二进制内容。
+     */
+    private static byte[] readBytesWithTimeout(java.lang.Process p, long timeoutMs) {
+        byte[][] holder = new byte[1][];
+        Thread reader = new Thread(() -> {
+            try {
+                holder[0] = ByteStreamsKt.readBytes(p.getInputStream());
+            } catch (Exception e) {
+                Log.d(TAG, "读二进制流异常: " + e);
+            }
+        }, "proc-reader-bytes");
+        reader.setDaemon(true);
+        reader.start();
+        boolean finished = false;
+        try {
+            finished = p.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            Log.d(TAG, "waitFor 异常: " + e);
+        }
+        if (!finished) {
+            Log.d(TAG, "命令超时(" + timeoutMs + "ms)，强制结束进程");
+            try {
+                p.destroy();
+            } catch (Exception ignored) {
+            }
+            return null;
+        }
+        try {
+            reader.join(2000L);
+        } catch (Exception ignored) {
+        }
+        return (p.exitValue() == 0) ? holder[0] : null;
+    }
+
+    /**
+     * 带超时的进程输出读取。
+     *
+     * ★ 修复「命令卡住后台线程永久阻塞」：
+     *   原实现在主流程里直接 readBytes() 再 waitFor()，两个都没有超时。
+     *   当 ls 遇到挂载点、tar 处理超大文件、cp 遇到坏块时，种子进程可能长时间
+     *   不产出也不退出，读流会一直阻塞 —— 命令永远不返回，UI 停在加载态。
+     *   这里把读流放到独立线程，主流程用 waitFor(超时) 兜底，
+     *   超时就 destroy 进程，避免线程被永久占用。
+     *
+     * @return 进程正常退出返回输出；超时或失败返回 null
+     */
+    private static String readWithTimeout(java.lang.Process p, long timeoutMs) {
+        String[] holder = new String[1];
+        Thread reader = new Thread(() -> {
+            try {
+                InputStream is = p.getInputStream();
+                holder[0] = new String(ByteStreamsKt.readBytes(is), Charsets.UTF_8);
+            } catch (Exception e) {
+                Log.d(TAG, "读流异常: " + e);
+            }
+        }, "proc-reader");
+        reader.setDaemon(true);
+        reader.start();
+        boolean finished = false;
+        try {
+            finished = p.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            Log.d(TAG, "waitFor 异常: " + e);
+        }
+        if (!finished) {
+            Log.d(TAG, "命令超时(" + timeoutMs + "ms)，强制结束进程");
+            try {
+                p.destroy();
+            } catch (Exception ignored) {
+            }
+            return null;
+        }
+        try {
+            // 进程已退出，读流线程通常很快收尾；给它一点时间把剩余输出读完
+            reader.join(2000L);
+        } catch (Exception ignored) {
+        }
+        return (p.exitValue() == 0) ? holder[0] : null;
+    }
+
     public final String exec(String cmd) {
         Intrinsics.checkNotNullParameter(cmd, "cmd");
         if (rootAvailable()) {
@@ -568,13 +655,7 @@ public final class Engine {
         }
         try {
             java.lang.Process p = new ProcessBuilder("sh", "-c", cmd).redirectErrorStream(true).start();
-            InputStream inputStream = p.getInputStream();
-            Intrinsics.checkNotNullExpressionValue(inputStream, "getInputStream(...)");
-            String out = new String(ByteStreamsKt.readBytes(inputStream), Charsets.UTF_8);
-            if (p.waitFor() == 0) {
-                return out;
-            }
-            return null;
+            return readWithTimeout(p, EXEC_TIMEOUT_MS);
         } catch (Exception e) {
             return null;
         }
@@ -589,10 +670,8 @@ public final class Engine {
                 java.lang.Process p = null;
                 try {
                     p = new ProcessBuilder("su", "-c", "sh -c " + q(cmd)).start();
-                    InputStream inputStream = p.getInputStream();
-                    Intrinsics.checkNotNullExpressionValue(inputStream, "getInputStream(...)");
-                    byte[] data = ByteStreamsKt.readBytes(inputStream);
-                    if (p.waitFor() == 0) {
+                    byte[] data = readBytesWithTimeout(p, EXEC_TIMEOUT_MS);
+                    if (data != null) {
                         return data;
                     }
                     Log.d(TAG, "execBytes 第 " + (attempt + 1) + " 次失败，cmd=" + cmd);
@@ -618,11 +697,7 @@ public final class Engine {
             java.lang.Process p2 = new ProcessBuilder("sh", "-c", cmd).start();
             InputStream inputStream2 = p2.getInputStream();
             Intrinsics.checkNotNullExpressionValue(inputStream2, "getInputStream(...)");
-            byte[] data2 = ByteStreamsKt.readBytes(inputStream2);
-            if (p2.waitFor() == 0) {
-                return data2;
-            }
-            return null;
+            return readBytesWithTimeout(p2, EXEC_TIMEOUT_MS);
         } catch (Exception e2) {
             return null;
         }
@@ -885,12 +960,10 @@ public final class Engine {
         boolean ok = false;
         try {
             java.lang.Process p = new ProcessBuilder("su", "-c", "busybox script -q -c 'true' /dev/null").redirectErrorStream(true).start();
-            String out = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            p.waitFor();
-            if (p.exitValue() == 0) {
-                if (!Kt.contains((CharSequence) out, (CharSequence) "Usage:", false, 2, (Object) null)) {
-                    ok = true;
-                }
+            // 探测类命令也用统一超时：卡住时返回 null，按"无 PTY"处理，不阻塞启动流程
+            String out = readWithTimeout(p, 15000L);
+            if (out != null && !Kt.contains((CharSequence) out, (CharSequence) "Usage:", false, 2, (Object) null)) {
+                ok = true;
             }
         } catch (Exception e) {
         }
