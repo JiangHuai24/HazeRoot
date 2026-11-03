@@ -261,7 +261,7 @@ public final class MediaActivity extends AppCompatActivity {
                         this.$vv.setOnErrorListener(new android.media.MediaPlayer.OnErrorListener() {
                             @Override
                             public boolean onError(android.media.MediaPlayer mp, int what, int extra) {
-                                return AnonymousClass2.invoke$lambda$1(AnonymousClass2.this.this$0, mp, what, extra);
+                                return AnonymousClass2.invoke$lambda$1(AnonymousClass2.this.this$0, AnonymousClass2.this.$vv, mp, what, extra);
                             }
                         });
                         return;
@@ -275,11 +275,26 @@ public final class MediaActivity extends AppCompatActivity {
                     }
 
                     /* JADX INFO: Access modifiers changed from: private */
-                    public static final boolean invoke$lambda$1(MediaActivity this$0, MediaPlayer mediaPlayer, int i, int i2) {
+                    public static final boolean invoke$lambda$1(MediaActivity this$0, VideoView vv, MediaPlayer mediaPlayer, int i, int i2) {
                         Intrinsics.checkNotNullParameter(this$0, "this$0");
-                        String string = this$0.getString(R.string.media_load_fail);
-                        Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
-                        this$0.toast(string);
+                        Intrinsics.checkNotNullParameter(vv, "$vv");
+                        // 视频播放出错的收口。使用 vv.stopPlayback() 而非对内部 MediaPlayer 直接操作：
+                        // 它会把 VideoView 的 mMediaPlayer 置 null 并释放，
+                        // 避免用户在同一页面重选视频时复用一个 Idle 态播放器。
+                        this$0.toast(this$0.getString(R.string.media_load_fail));
+                        try {
+                            vv.stopPlayback();
+                        } catch (Exception ignored) {
+                        }
+                        this$0.prepared = false;
+                        try {
+                            this$0.h.removeCallbacks(this$0.tick);
+                        } catch (Exception ignored) {
+                        }
+                        TextView play = this$0.btnPlay;
+                        if (play != null) {
+                            play.setText("\u25B6");
+                        }
                         return true;
                     }
                 }
@@ -490,7 +505,7 @@ public final class MediaActivity extends AppCompatActivity {
         player.start();
         TextView textView = this$0.btnPlay;
         if (textView != null) {
-            textView.setText("⏸");
+            textView.setText("\u23F8");
         }
         this$0.h.post(this$0.tick);
     }
@@ -502,14 +517,16 @@ public final class MediaActivity extends AppCompatActivity {
         if (textView == null) {
             return;
         }
-        textView.setText("▶");
+        textView.setText("\u25B6");
     }
 
     /* JADX INFO: Access modifiers changed from: private */
     public static final boolean startAudio$lambda$20(MediaActivity this$0, MediaPlayer mediaPlayer, int i, int i2) {
         Intrinsics.checkNotNullParameter(this$0, "this$0");
-        // ★ 修复：原实现只弹 toast 就 return，既不 release 也不把 mp 置 null，
-        //   出错后 this$0.tick 会继续每秒轮询一个 error 状态的 player（反复触发 onError）。
+        // 播放出错后的收口：释放播放器、停轮询、复位状态。
+        // 必须把 prepared 置回 false 并复位播放键 ——
+        // 否则 toggle() 第一句 `if (m == null) return` 会让播放键彻底失效，
+        // 用户只能退出重进（这是比原泄漏更严重的死状态）。
         this$0.toast(this$0.getString(R.string.media_load_fail));
         try {
             mediaPlayer.release();
@@ -518,9 +535,14 @@ public final class MediaActivity extends AppCompatActivity {
         if (this$0.mp == mediaPlayer) {
             this$0.mp = null;
         }
+        this$0.prepared = false;
         try {
             this$0.h.removeCallbacks(this$0.tick);
         } catch (Exception ignored) {
+        }
+        TextView play = this$0.btnPlay;
+        if (play != null) {
+            play.setText("\u25B6");
         }
         return true;
     }
@@ -535,14 +557,14 @@ public final class MediaActivity extends AppCompatActivity {
                 m.start();
                 TextView textView = this.btnPlay;
                 if (textView != null) {
-                    textView.setText("⏸");
+                    textView.setText("\u23F8");
                 }
                 return;
             }
             m.pause();
             TextView textView2 = this.btnPlay;
             if (textView2 != null) {
-                textView2.setText("▶");
+                textView2.setText("\u25B6");
             }
         } catch (Exception e) {
         }
