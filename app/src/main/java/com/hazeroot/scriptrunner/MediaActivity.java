@@ -681,10 +681,10 @@ public final class MediaActivity extends AppCompatActivity {
 
     @Override // android.app.Activity
     protected void onStop() {
-        // ★ 修复：原只在 onDestroy 释放。低端机上连续开关页面时，
-        //   旧的 MediaPlayer 在 Activity 停止后仍持有音频焦点，
-        //   新实例 prepare 会拿到 error (-38,0)。
-        //   这里在 onStop 先暂停并释放，onDestroy 只做兜底。
+        // 说明：这里只暂停，不释放。释放留给 onDestroy（见上）。
+        // 原实现没有 onStop 处理，切换页面后音频继续播。
+        // 暂停是用户可见的行为变更，但符合「离开页面即停止播放」的预期；
+        // 若将来需要「切出后续播」，删掉本方法即可恢复。
         try {
             if (this.mp != null && this.mp.isPlaying()) {
                 this.mp.pause();

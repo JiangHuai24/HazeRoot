@@ -1783,13 +1783,14 @@ public final class FilesFragment extends Fragment {
                     this$1.showMtActionPanel(e, this$0);
                     return;
                 }
-                // 符号链接：目录则进入本体路径，文件则打开其指向的目标。
-                // 原 JADX 产物这里无条件 checkNotNull(getLinkTarget())，
-                // 而 ls 解析在「名字含 " -> " 但它是目录」时 target 可能为 null，
-                // 一旦命中就是必崩的 NullPointerException。这里改为空值安全回退到本体路径。
-                String linkTarget = StringsKt.isBlank(e.getLinkTarget())
-                        ? e.getPath()
-                        : e.getLinkTarget();
+                // 符号链接：进入其指向的目标。
+                // 说明：此分支仅在 getLinkTarget() != null 时可达（上面已判空 return），
+                // 所以这里不存在 NPE 风险；下面的空串回退只是防御性优化 ——
+                // 当 linkTarget 为 "" 时用条目自身路径，避免 load("") 触发一次无意义的读取失败。
+                String linkTarget = e.getLinkTarget();
+                if (linkTarget.length() == 0) {
+                    linkTarget = e.getPath();
+                }
                 load$default(this$0, linkTarget, 0, 2, null);
                 return;
             }
@@ -2028,13 +2029,12 @@ public final class FilesFragment extends Fragment {
                     return;
                 }
                 if (list.size() == 1 && ((FsEntry) list.get(0)).getLinkTarget() != null && $follow < 3) {
-                    // ★ 与 onItemClick 同根因修复：ls 解析在「名字含 " -> " 但其实是目录」时
-                    //   可能给出 linkTarget=null，这里虽然外层已判过 !null，
-                    //   但 JADX 留了一句冗余 checkNotNull —— 换成空值安全写法，命中也不会崩。
+                    // 单条目软链自动跟随（最多 3 层）。
+                    // 说明：原实现此处的 checkNotNull 是冗余的 —— 外层已判 getLinkTarget() != null。
+                    // 空串时保持原行为：拼出 newDir + "/" 后与 newDir 不相等会尝试跟随，
+                    // 拼出与 newDir 相等则静默停止。不要在这里用 getPath() 替换，
+                    // 否则空串会真的去 load 条目路径，文件条目必然读取失败并多弹一次错误提示。
                     String t = ((FsEntry) list.get(0)).getLinkTarget();
-                    if (t == null || t.length() == 0) {
-                        t = ((FsEntry) list.get(0)).getPath();
-                    }
                     if (!Kt.startsWith(t, "/", false, 2, (Object) null)) {
                         t = StringsKt.trimEnd(newDir, '/') + "/" + t;
                     }

@@ -15,7 +15,7 @@
     <string name="apk_perm_msg">Installing APKs requires the Install unknown apps permission. Tap Go to allow HazeRoot to install apps, then tap the APK again.</string>
     <string name="apk_perm_title">Install permission needed</string>
     <string name="apk_preparing">Preparing to install…</string>
-    <string name="app_name">HazeRoot</string>
+    <string name="app_name">HazeRoot Dev</string>
     <string name="apply">Apply</string>
     <string name="auto_input_fmt">>> [Auto] typed: %1$s</string>
     <string name="banner_waiting">%1$d scripts · ready</string>

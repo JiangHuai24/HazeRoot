@@ -333,10 +333,6 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
             Preset p = new Preset(name, copied, "");
             Engine.INSTANCE.getPresets().add(p);
             Store.INSTANCE.savePresets(requireContext(), Engine.INSTANCE.getPresets());
-            int answers = 0;
-            for (ScriptItem s : copied) {
-                answers += s.getRecordedInputs().size();
-            }
             // preset_saved_fmt 只有一个占位符 %1$s（方案名）。
             // 原 JADX 调用多传了 2 个参数 → String.format 抛
             // MissingFormatArgumentException，被下方 catch 吞掉后弹「保存失败」，
