@@ -85,6 +85,8 @@ public final class Engine {
     private static final Handler main = new Handler(Looper.getMainLooper());
     private static volatile String currentPartial = "";
     private static volatile String lastFullLine = "";
+    /** 收尾时识别残留 __HR_EXIT_N__ 标记用（runOne 内 EXIT_RE 的静态等价版） */
+    private static final java.util.regex.Pattern EXIT_RES = java.util.regex.Pattern.compile("__HR_EXIT_(\\d+)__");
     private static final Object recordLock = new Object();
     private static volatile String presetTargetApp = "";
     // 终端缓冲已抽出到 hazefs.exec.TermBuffer（见下方 TERM 字段），
@@ -1364,6 +1366,24 @@ public final class Engine {
         }
         currentProc = null;
         currentScriptPath = "";
+        // ★ 修复「终端页黄字提示一直留存」：
+        //   脚本结束时 __HR_EXIT_N__ 标记后面没有换行，残留 partial 会被
+        //   上面的「提示行识别」当成 prompt（lastPromptText = "__HR_EXIT_0__"），
+        //   emit("prompt", ...) 让终端页的提示行显示这段内部标记，
+        //   脚本都跑完了它还挂在输入框上方，很不美观。
+        //   收尾统一清场：残留行若只是 EXIT 标记就整行吞掉；否则保留为普通输出。
+        String leftover = currentPartial;
+        if (leftover != null && leftover.length() > 0) {
+            if (EXIT_RES.matcher(leftover).matches()) {
+                // 残留就是内部标记本身 → 静默吞掉，不留痕
+            } else {
+                // 有真实内容 → 正常落盘为一行输出
+                logRaw(new StringBuilder(leftover));
+            }
+            currentPartial = "";
+            lastPromptText = "";
+            emit("prompt", "");   // 通知 UI 撤下提示行
+        }
     }
 
     /* JADX INFO: Access modifiers changed from: private */
