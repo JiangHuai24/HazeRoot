@@ -21,11 +21,11 @@ android {
     buildTypes {
         getByName("debug") {
             isMinifyEnabled = false
-            // ★ 开发期包名隔离：避免覆盖实机上已安装、可正常使用的正式版 App。
-            //   最终定稿时删除这段，恢复与 release 相同的 applicationId。
-            applicationIdSuffix = ".dev"
-            versionNameSuffix = "-dev"
-            resValue("string", "app_name", "HazeRoot Dev")
+            // 包名与 release 一致（applicationId 已是正式包名）。
+            // 开发期若需与实机正式版并存，临时加回：
+            //   applicationIdSuffix = ".dev"
+            //   versionNameSuffix = "-dev"
+            //   resValue("string", "app_name", "HazeRoot Dev")
         }
     }
 
