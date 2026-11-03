@@ -4369,8 +4369,66 @@ public final class FilesFragment extends Fragment {
         new Thread(new Runnable() {
             @Override // java.lang.Runnable
             public final void run() {
-                final String r = Engine.INSTANCE.exec("mv " + Engine.INSTANCE.q(src) + " " + Engine.INSTANCE.q(dst));
+                // ★ 修复「重命名静默覆盖导致数据丢失」：
+                //   POSIX mv 对同名普通文件是静默替换。用户把 A 改成同目录已存在的 B 的名字，
+                //   B 会被无声覆盖、不可撤销。这里先探测目标是否存在，冲突时回主线程询问。
+                String probe = Engine.INSTANCE.exec("[ -e " + Engine.INSTANCE.q(dst) + " ] && echo Y");
+                final boolean exists = probe != null && Kt.contains((CharSequence) probe, (CharSequence) "Y", false, 2, (Object) null);
                 Activity act = this$0.getActivity();
+                if (act == null) {
+                    return;
+                }
+                if (exists) {
+                    act.runOnUiThread(new Runnable() {
+                        @Override // java.lang.Runnable
+                        public final void run() {
+                            final String base = nn;
+                            new AlertDialog.Builder(this$0.requireContext())
+                                    .setTitle("名称已存在")
+                                    .setMessage("同目录下已有「" + nn + "」，继续会覆盖它。")
+                                    .setPositiveButton("覆盖", (d, w) -> doRename(src, dst, this$0, pane))
+                                    .setNeutralButton("自动改名", (d, w) -> doRename(src, autoRenamedDst(dst), this$0, pane))
+                                    .setNegativeButton(this$0.getString(R.string.cancel), (DialogInterface.OnClickListener) null)
+                                    .show();
+                        }
+                    });
+                    return;
+                }
+                act.runOnUiThread(new Runnable() {
+                    @Override // java.lang.Runnable
+                    public final void run() {
+                        doRename(src, dst, this$0, pane);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /** 生成一个不冲突的目标路径：name(1).ext / name(1) */
+    private static String autoRenamedDst(String dst) {
+        int slash = dst.lastIndexOf('/');
+        String dir = slash >= 0 ? dst.substring(0, slash) : "";
+        String file = slash >= 0 ? dst.substring(slash + 1) : dst;
+        int dot = file.lastIndexOf('.');
+        String stem = dot > 0 ? file.substring(0, dot) : file;
+        String ext = dot > 0 ? file.substring(dot) : "";
+        for (int i = 1; i < 100; i++) {
+            String candidate = dir + "/" + stem + "(" + i + ")" + ext;
+            String probe = Engine.INSTANCE.exec("[ -e " + Engine.INSTANCE.q(candidate) + " ] && echo Y");
+            if (probe == null || !Kt.contains((CharSequence) probe, (CharSequence) "Y", false, 2, (Object) null)) {
+                return candidate;
+            }
+        }
+        return dst;
+    }
+
+    /** 实际执行 mv 并在主线程反馈结果 */
+    private static void doRename(String src, String dst, final FilesFragment frag, final Pane pane) {
+        new Thread(new Runnable() {
+            @Override // java.lang.Runnable
+            public final void run() {
+                final String r = Engine.INSTANCE.exec("mv " + Engine.INSTANCE.q(src) + " " + Engine.INSTANCE.q(dst));
+                Activity act = frag.getActivity();
                 if (act == null) {
                     return;
                 }
@@ -4378,13 +4436,13 @@ public final class FilesFragment extends Fragment {
                     @Override // java.lang.Runnable
                     public final void run() {
                         if (r == null) {
-                            String string2 = this$0.getString(R.string.rename_fail);
+                            String string2 = frag.getString(R.string.rename_fail);
                             Intrinsics.checkNotNullExpressionValue(string2, "getString(...)");
-                            this$0.toast(string2);
+                            frag.toast(string2);
                         } else {
-                            String string3 = this$0.getString(R.string.renamed);
+                            String string3 = frag.getString(R.string.renamed);
                             Intrinsics.checkNotNullExpressionValue(string3, "getString(...)");
-                            this$0.toast(string3);
+                            frag.toast(string3);
                             Pane.load$default(pane, pane.getDir(), 0, 2, null);
                         }
                     }
