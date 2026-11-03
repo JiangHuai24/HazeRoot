@@ -270,6 +270,31 @@ public final class Engine {
         }
     }
 
+    /** 当前缓冲长度（避免为"有没有新内容"而全量复制） */
+    public final int termLength() {
+        synchronized (TERM_LOCK) {
+            return termBuffer.length();
+        }
+    }
+
+    /**
+     * 只取 [from, to) 区间的增量片段，不做全量复制。
+     * syncTerm() 现在走这个方法：长输出时每次只复制新增的那一小段，
+     * 避免每来一条 log 都 toString() 整个缓冲（20 万字符时是 O(n²)）。
+     * 越界会做安全钳制；from >= to 返回空串。
+     */
+    public final String termSlice(int from, int to) {
+        synchronized (TERM_LOCK) {
+            int len = termBuffer.length();
+            int f = Math.max(0, from);
+            int t = Math.min(to, len);
+            if (t <= f) {
+                return "";
+            }
+            return termBuffer.substring(f, t);
+        }
+    }
+
     /**
      * 终端欢迎语（终端页首次打开或清空后显示）。
      * 内容：版本 + 当前队列状态 + 一句操作提示。

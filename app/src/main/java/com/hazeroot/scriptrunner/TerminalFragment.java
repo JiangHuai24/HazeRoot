@@ -348,17 +348,21 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
     }
 
     /** 增量渲染：与 QueueFragment 同一套「带标记长度」游标策略 */
+    /** 增量渲染：与 QueueFragment 同一套「带标记长度」游标策略 */
     private void syncTerm() {
         if (termView == null || termScroll == null) {
             return;
         }
-        String buf = Engine.INSTANCE.snapshotTerm();
+        // 性能优化：只取长度判断有无新内容，不再每次 snapshotTerm() 全量 toString()。
+        // 长输出（20 万字符上限）时，原来每来一条 log 都复制整段，是 O(n²)；
+        // 现在改为只复制 [renderedChars, len) 这一段。
+        int len = Engine.INSTANCE.termLength();
         Editable dst = termView.getEditableText();
         if (dst == null) {
             return;
         }
         // buffer 为空 → 显示欢迎语（版本 + 队列状态 + 操作提示），不留空白
-        if (buf.length() == 0) {
+        if (len == 0) {
             if (renderedChars != -1) {
                 dst.clear();
                 dst.append(Engine.INSTANCE.welcomeText());
@@ -371,18 +375,23 @@ public final class TerminalFragment extends Fragment implements Engine.Listener 
             dst.clear();
             renderedChars = 0;
         }
-        if (buf.length() < renderedChars) {
+        // 缓冲被裁剪（或被清空重建）→ 游标失效，整体重绘
+        if (len < renderedChars) {
             renderedChars = 0;
             dst.clear();
         }
-        if (buf.length() > renderedChars) {
+        if (len > renderedChars) {
             boolean initial = renderedChars == 0;
             boolean atBottom = !termScroll.canScrollVertically(1);
             if (initial) {
                 dst.clear();
             }
-            appendStyled(dst, buf.substring(renderedChars));
-            renderedChars = buf.length();
+            // 只复制新增片段（不再全量）
+            String chunk = Engine.INSTANCE.termSlice(renderedChars, len);
+            if (chunk.length() > 0) {
+                appendStyled(dst, chunk);
+            }
+            renderedChars = len;
             if (initial || atBottom) {
                 termScroll.post(() -> termScroll.fullScroll(View.FOCUS_DOWN));
             }
