@@ -94,10 +94,11 @@ public final class Engine {
     private static volatile boolean pendingClearScreen = false;
     private static volatile boolean pendingClearLine = false;
     private static volatile String lastPromptText = "";
-    // 方案重放时的降级匹配：规范化 key 映射 + 顺序回退
-    private static volatile java.util.Map<String, List<String>> pendingNormalized = null;
-    private static volatile List<String> pendingOrdered = null;
-    private static volatile int orderedCursor = 0;
+    // [D-004] 应答匹配三级降级（精确 → 规范化 → 顺序回退）已抽出到 hazefs/exec/PromptMatcher.kt
+    //   原实现是三个 volatile 静态字段（pendingNormalized / pendingOrdered / orderedCursor），
+    //   跨线程读写且逻辑内联在 runOne 循环里，无法单测。现在由独立类承载，有 15 个单测。
+    private static volatile com.hazeroot.scriptrunner.hazefs.exec.PromptMatcher promptMatcher = null;
+    // 兼容：pending 精确表仍由 Engine 直接持有（runOne 里要用它的 isEmpty 判断是否自动应答）
 
     /* compiled from: Engine.kt */
     
@@ -1094,17 +1095,14 @@ public final class Engine {
                 }
             }
             pending = m;
+            pending = m;
             // ★ 方案库保留已录答案：脚本更新后提示文案可能变化，精确匹配会失效。
-            //   这里额外准备两条降级链：
-            //     ① 规范化 key（去空白/去标点/小写）后的映射
-            //     ② 按录制顺序的顺序回退列表（提示对不上时依次取用）
-            pendingNormalized = new LinkedHashMap<>();
-            pendingOrdered = new ArrayList<>();
-            for (Map.Entry<String, List<String>> en : m.entrySet()) {
-                pendingNormalized.put(normalizePrompt(en.getKey()), en.getValue());
-                pendingOrdered.addAll(en.getValue());
-            }
-            orderedCursor = 0;
+            //   [D-004] 三级降级（精确 → 规范化 → 顺序回退）由 hazefs.exec.PromptMatcher 承载，
+            //   它内部维护三份独立副本，避免「精确级取走连带消耗规范化级」的旧缺陷。
+            com.hazeroot.scriptrunner.hazefs.exec.PromptMatcher pm =
+                    new com.hazeroot.scriptrunner.hazefs.exec.PromptMatcher();
+            pm.load(m);
+            promptMatcher = pm;
         }
         synchronized (recordLock) {
             recordingCollect = auto ? null : new LinkedHashMap<String, List<String>>();
@@ -1241,28 +1239,13 @@ public final class Engine {
                 }
                 if (pending != null && !pending.isEmpty()) {
                     String key = promptKey();
-                    // ★ 三级降级匹配（让脚本更新后仍能沿用已录答案）：
-                    //   ① 精确 prompt 文本
-                    //   ② 规范化后匹配（去空白/标点/小写）
-                    //   ③ 顺序回退（提示文案完全变了，就按录制顺序依次取用）
-                    List<String> vals = pending.get(key);
-                    if (vals == null || vals.isEmpty()) {
-                        java.util.Map<String, List<String>> norm = pendingNormalized;
-                        if (norm != null) {
-                            vals = norm.get(normalizePrompt(key));
-                        }
-                    }
-                    if (vals == null || vals.isEmpty()) {
-                        List<String> ordered = pendingOrdered;
-                        if (ordered != null && orderedCursor < ordered.size()) {
-                            String fallback = ordered.get(orderedCursor);
-                            orderedCursor++;
-                            vals = new ArrayList<>();
-                            vals.add(fallback);
-                        }
-                    }
-                    if (vals != null && !vals.isEmpty()) {
-                        String v = vals.remove(0);
+                    // [D-004] 三级降级（精确 → 规范化 → 顺序回退）交给 hazefs.exec.PromptMatcher。
+                    //   它内部维护三份独立副本，避免旧实现「精确级取走连带消耗规范化级」的缺陷。
+                    //   降级语义与原实现一致：只要上一级没取到值就继续往下走。
+                    com.hazeroot.scriptrunner.hazefs.exec.PromptMatcher pm = promptMatcher;
+                    String resolved = (pm == null) ? null : pm.resolve(key);
+                    if (resolved != null) {
+                        String v = resolved;
                         try {
                             OutputStream os = proc.getOutputStream();
                             os.write((v + "\n").getBytes(Charsets.UTF_8));
