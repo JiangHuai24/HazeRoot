@@ -715,28 +715,27 @@ public final class Engine {
                         s.setRunningNow(true);
                         s.setExitCode(null);
                         Engine.INSTANCE.emit("state", "");
-                        if (auto) {
-                            str = Engine.presetTargetApp;
-                            if ((str.length() > 0) && i3 == CollectionsKt.getLastIndex(list)) {
-                                z = Engine.hadAutoInput;
-                                if (z) {
-                                    thread = ThreadsKt.thread(true, false, null, "idle-watch", -1, new Function0<Unit>() { // from class: com.hazeroot.scriptrunner.Engine$runQueue$1.1
-                                        @Override // kotlin.jvm.functions.Function0
-                                        public /* bridge */ /* synthetic */ Unit invoke() {
-                                            invoke2();
-                                            return Unit.INSTANCE;
-                                        }
-
-                                        /* renamed from: invoke, reason: avoid collision after fix types in other method */
-                                        public final void invoke2() {
-                                            Engine.INSTANCE.watchIdle();
-                                        }
-                                    });
-                                    idleWatch = thread;
-                                }
-                            }
-                        }
                         Engine.INSTANCE.runOne(s, auto);
+                        // ★ 修复「方案重放收尾静默失效」（自 fix/slow-repair 移植）：
+                        //   原实现在 runOne() 之前读 hadAutoInput（恒为 false，它在 runOne 内部才置 true），
+                        //   导致 idleWatch 永不创建，「静止 30s → 跳目标 App → 退出」从不执行。
+                        //   现在移到 runOne 之后，并按「本脚本确实有录制答案」判断（hadAutoInput 是全局态，跨脚本会串）。
+                        if (auto && Engine.presetTargetApp.length() > 0
+                                && i3 == CollectionsKt.getLastIndex(list)
+                                && Engine.INSTANCE.hadAutoInputFor(s)) {
+                            idleWatch = ThreadsKt.thread(true, false, null, "idle-watch", -1, new Function0<Unit>() { // from class: com.hazeroot.scriptrunner.Engine$runQueue$1.1
+                                @Override // kotlin.jvm.functions.Function0
+                                public /* bridge */ /* synthetic */ Unit invoke() {
+                                    invoke2();
+                                    return Unit.INSTANCE;
+                                }
+
+                                /* renamed from: invoke, reason: avoid collision after fix types in other method */
+                                public final void invoke2() {
+                                    Engine.INSTANCE.watchIdle();
+                                }
+                            });
+                        }
                         if (idleWatch != null) {
                             idleWatch.interrupt();
                         }
@@ -818,6 +817,25 @@ public final class Engine {
                 }
             }
         });
+    }
+
+    /**
+     * 该脚本是否有可用于重放的录制答案（自 fix/slow-repair 移植）。
+     * 比全局 hadAutoInput 更准确：后者在一次会话内被任一脚本置 true 就不复位，
+     * 后面的脚本即使没有录制答案也会错误触发收尾。
+     */
+    final boolean hadAutoInputFor(com.hazeroot.scriptrunner.ScriptItem s) {
+        if (s == null) {
+            return false;
+        }
+        try {
+            java.util.List<com.hazeroot.scriptrunner.RecordedInput> rec = s.getRecordedInputs();
+            if (rec != null && rec.size() > 0) {
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
     }
 
     /* JADX INFO: Access modifiers changed from: private */
