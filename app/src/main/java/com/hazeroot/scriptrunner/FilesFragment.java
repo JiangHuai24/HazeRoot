@@ -2843,6 +2843,10 @@ public final class FilesFragment extends Fragment {
                         if (mx > slop || my > slop) {
                             view2.removeCallbacks(mtLongPress);
                         }
+                        // ★ 回归修复：未长按时 MOVE 必须转发给 lambda39，
+                        //   否则左滑启动（mode=1）永远不会发生 —— 左滑功能整个失效。
+                        boolean handledMove = FilesFragment.bindSwipe$lambda$39(downX, downY, startTx, mode, longFired, dragAnchor, listTop, FilesFragment.this, item, mtLongPress, maxSwipe, slop, pane2, list, view2, motionEvent);
+                        return handledMove;
                     } else if (mx > slop || my > slop) {
                         // 长按已成立 + 有位移 → 进入框选（mode 走 2），并标记已拖动
                         dragged[0] = true;
