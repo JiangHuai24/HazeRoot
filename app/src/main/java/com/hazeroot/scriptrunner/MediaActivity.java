@@ -261,7 +261,7 @@ public final class MediaActivity extends AppCompatActivity {
                         this.$vv.setOnErrorListener(new android.media.MediaPlayer.OnErrorListener() {
                             @Override
                             public boolean onError(android.media.MediaPlayer mp, int what, int extra) {
-                                return AnonymousClass2.invoke$lambda$1(AnonymousClass2.this.this$0, mp, what, extra);
+                                return AnonymousClass2.invoke$lambda$1(AnonymousClass2.this.this$0, AnonymousClass2.this.$vv, mp, what, extra);
                             }
                         });
                         return;
@@ -275,11 +275,26 @@ public final class MediaActivity extends AppCompatActivity {
                     }
 
                     /* JADX INFO: Access modifiers changed from: private */
-                    public static final boolean invoke$lambda$1(MediaActivity this$0, MediaPlayer mediaPlayer, int i, int i2) {
+                    public static final boolean invoke$lambda$1(MediaActivity this$0, VideoView vv, MediaPlayer mediaPlayer, int i, int i2) {
                         Intrinsics.checkNotNullParameter(this$0, "this$0");
-                        String string = this$0.getString(R.string.media_load_fail);
-                        Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
-                        this$0.toast(string);
+                        Intrinsics.checkNotNullParameter(vv, "$vv");
+                        // ★ 修复（自 fix/slow-repair 移植）：原实现只 toast 就 return true，
+                        //   视频出错后不复位、轮询不停。用 vv.stopPlayback() 让 VideoView
+                        //   把内部 mMediaPlayer 置 null，避免复用已释放实例。
+                        this$0.toast(this$0.getString(R.string.media_load_fail));
+                        try {
+                            vv.stopPlayback();
+                        } catch (Exception ignored) {
+                        }
+                        this$0.prepared = false;
+                        try {
+                            this$0.h.removeCallbacks(this$0.tick);
+                        } catch (Exception ignored) {
+                        }
+                        TextView play = this$0.btnPlay;
+                        if (play != null) {
+                            play.setText("\u25B6");
+                        }
                         return true;
                     }
                 }
@@ -521,6 +536,13 @@ public final class MediaActivity extends AppCompatActivity {
         try {
             this$0.h.removeCallbacks(this$0.tick);
         } catch (Exception ignored) {
+        }
+        // ★ 补（自 fix/slow-repair 移植）：必须复位 prepared 与播放键，
+        //   否则 toggle() 第一句 if (m == null) return 会让播放键彻底失效，只能退出重进。
+        this$0.prepared = false;
+        TextView playV = this$0.btnPlay;
+        if (playV != null) {
+            playV.setText("\u25B6");
         }
         return true;
     }
