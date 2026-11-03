@@ -1475,26 +1475,22 @@ public final class QueueFragment extends Fragment {
     /* JADX INFO: Access modifiers changed from: private */
     public static final void threadRootCheck$lambda$38$lambda$37(QueueFragment this$0, boolean $ok) {
         Intrinsics.checkNotNullParameter(this$0, "this$0");
+        // ★ 修复「旋转屏/换主题时崩溃」（自 fix/slow-repair 移植）：
+        //   refreshRoot 有约 11 秒窗口，回调返回时 Fragment 可能已销毁、
+        //   onDestroyView 已把 rootText/rootDot 置 null。同类回调都有 isAdded() 保护，只这处漏了。
+        if (!this$0.isAdded() || this$0.getView() == null) {
+            return;
+        }
         TextView textView = this$0.rootText;
-        View view = null;
         if (textView == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("rootText");
-            textView = null;
+            return;
         }
         textView.setText(this$0.getString($ok ? R.string.root_active : R.string.root_denied));
-        TextView textView2 = this$0.rootText;
-        if (textView2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("rootText");
-            textView2 = null;
+        textView.setTextColor(this$0.c($ok ? R.color.label_secondary : R.color.error_text));
+        View dot = this$0.rootDot;
+        if (dot != null) {
+            dot.setBackgroundResource($ok ? R.drawable.dot_done : R.drawable.dot_error);
         }
-        textView2.setTextColor(this$0.c($ok ? R.color.label_secondary : R.color.error_text));
-        View view2 = this$0.rootDot;
-        if (view2 == null) {
-            Intrinsics.throwUninitializedPropertyAccessException("rootDot");
-        } else {
-            view = view2;
-        }
-        view.setBackgroundResource($ok ? R.drawable.dot_done : R.drawable.dot_error);
     }
 
     private final void showRootDialog() {
@@ -1688,13 +1684,33 @@ public final class QueueFragment extends Fragment {
     public static final void editScriptDialog$lambda$50(ScriptItem s, QueueFragment this$0, View it) {
         Intrinsics.checkNotNullParameter(s, "$s");
         Intrinsics.checkNotNullParameter(this$0, "this$0");
-        if (!Engine.INSTANCE.isElf(s.getPath())) {
-            this$0.startActivity(new Intent(this$0.requireContext(), (Class<?>) EditorActivity.class).putExtra("path", s.getPath()));
-            return;
-        }
-        String string = this$0.getString(R.string.err_elf_edit);
-        Intrinsics.checkNotNullExpressionValue(string, "getString(...)");
-        this$0.toast(string);
+        // ★ 修复「点编辑内容可能 ANR」（自 fix/slow-repair 移植）：
+        //   Engine.isElf() 内部走 exec → su（SU_LOCK 串行 + 3×60s 重试），主线程调用会冻结界面。
+        final String path = s.getPath();
+        new Thread(new Runnable() {
+            @Override // java.lang.Runnable
+            public final void run() {
+                final boolean elf = Engine.INSTANCE.isElf(path);
+                FragmentActivity act = this$0.getActivity();
+                if (act == null) {
+                    return;
+                }
+                act.runOnUiThread(new Runnable() {
+                    @Override // java.lang.Runnable
+                    public final void run() {
+                        if (!this$0.isAdded()) {
+                            return;
+                        }
+                        if (!elf) {
+                            this$0.startActivity(new Intent(this$0.requireContext(), (Class<?>) EditorActivity.class)
+                                    .putExtra("path", path));
+                        } else {
+                            this$0.toast(this$0.getString(R.string.err_elf_edit));
+                        }
+                    }
+                });
+            }
+        }, "elf-check").start();
     }
 
     /* JADX INFO: Access modifiers changed from: private */
