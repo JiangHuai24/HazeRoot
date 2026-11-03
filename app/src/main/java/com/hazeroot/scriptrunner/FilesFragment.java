@@ -223,6 +223,10 @@ public final class FilesFragment extends Fragment {
         loadFilePrefs();
         // 底部 5 图标工具栏：‹ › ＋ ⬅ ↑(加入队列)
         bindBottomToolbar(v);
+        // 防御性清理：onViewCreated 可能被多次调用（极端情况下视图重建），
+        // 若不清空会造成 panes 里堆叠多个 Pane 实例，导致同一目录被重复加载、
+        // 手势与选中态指向失效的旧 Pane。此处保证本次装配只有一对窗。
+        this.panes.clear();
         List<Pane> list = this.panes;
         View findViewById5 = v.findViewById(R.id.btnUpA);
         Intrinsics.checkNotNullExpressionValue(findViewById5, "findViewById(...)");
