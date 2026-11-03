@@ -23,11 +23,22 @@ object LsParser {
      * ```
      * drwxr-xr-x  2 root root 4096 2024-01-01 00:00 somedir
      * lrw-r--r--  1 root root   30 2009-01-01 08:00 adb_keys -> /product/etc/security/adb_keys
+     * crw-rw-rw-  1 root root  1,  3 2024-01-01 00:00 null          ← 设备文件，size 是 "主,次"
+     * drwxr-xr-x+ 2 root root 4096 2024-01-01 00:00 acl_dir         ← ACL 标记 +
+     * drwxr-xr-x. 2 root root 4096 2024-01-01 00:00 selinux_dir     ← SELinux 标记 .
      * ```
      * toybox 的日期恒为 ISO 格式、owner/group 不含空格，所以字段数稳定。
+     *
+     * ★ 三处关键兼容（真机 /dev 与 SELinux 挂载点实测）：
+     * 1. 权限组后可能有 ACL `+` 或 SELinux `.` 标记 —— 用 `[+.]?` 吃掉，
+     *    否则整行 MISS，用户进 /dev、/proc 会看到空目录。
+     * 2. 设备文件的 size 位是 `主设备号, 次设备号`（如 `1,  3`，内含空格），
+     *    不是单个数字 —— size 段必须同时接受 `\d+` 与 `\d+,\s*\d+` 两种形态。
+     * 3. 设备文件没有实际字节大小，size 统一按 0 处理（不影响 UI 展示）。
      */
     private val LS_RE = Pattern.compile(
-        "^([-dlbcps][rwxsStT.-]{9})\\s+\\d+\\s+\\S+\\s+\\S+\\s+(\\d+)\\s+\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}\\s(.+)$"
+        "^([-dlbcps][rwxsStT.-]{9})[+.]?\\s+\\d+\\s+\\S+\\s+\\S+\\s+" +
+            "(\\d+(?:,\\s*\\d+)?)\\s+\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}\\s(.+)$"
     )
 
     /**
@@ -86,7 +97,15 @@ object LsParser {
         if (name == "." || name == ".." || name.isEmpty()) return null
 
         val isDir = perm[0] == 'd'
-        val size = sizeStr?.toLongOrNull() ?: 0L
+        // ★ 设备文件（权限首位 b/c）的 size 是 "主设备号, 次设备号" 形态，
+        //   没有实际字节大小。这里统一按 0 处理 —— UI 显示 0B 也不影响使用，
+        //   但绝不能因为 toLongOrNull() 失败就把整行丢掉（那样 /dev 会显示空目录）。
+        val isDevice = perm[0] == 'b' || perm[0] == 'c'
+        val size = if (isDevice) {
+            0L
+        } else {
+            sizeStr?.toLongOrNull() ?: 0L
+        }
         return FileEntry(name, base + name, isDir, perm, size, target)
     }
 

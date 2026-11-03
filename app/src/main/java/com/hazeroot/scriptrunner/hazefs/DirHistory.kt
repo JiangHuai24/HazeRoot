@@ -13,6 +13,9 @@ class DirHistory(private val maxEntries: Int = MAX) {
     companion object {
         /** 默认上限，防止无限增长 */
         const val MAX = 60
+
+        /** 根目录 —— 上限截断时优先保留它，保证用户始终能后退回根 */
+        const val ROOT = "/"
     }
 
     private val stack = ArrayList<String>()
@@ -29,8 +32,13 @@ class DirHistory(private val maxEntries: Int = MAX) {
             stack.removeAt(stack.size - 1)
         }
         stack.add(dir)
-        if (stack.size > maxEntries) {
-            stack.removeAt(0)
+        // ★ 上限截断：**绝不淘汰根目录**。
+        //   原实现是从头部 removeAt(0)，实测后果是：记满 60 条后根目录 "/" 被挤掉，
+        //   用户再也「后退」不回去 —— 很别扭。
+        //   现在删除"最旧的非根目录"；若整个历史里只有根（异常情况），才退化删第一个。
+        while (stack.size > maxEntries) {
+            val victim = stack.indexOfFirst { it != ROOT }
+            stack.removeAt(if (victim == -1) 0 else victim)
         }
         cursor = stack.size - 1
     }

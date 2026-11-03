@@ -612,13 +612,8 @@ public final class FilesFragment extends Fragment {
      * 是否为压缩包（不应当作脚本执行）。
      */
     private boolean isArchiveFile(String name) {
-        if (name == null) {
-            return false;
-        }
-        String n = name.toLowerCase(java.util.Locale.ROOT);
-        return n.endsWith(".zip") || n.endsWith(".tar") || n.endsWith(".gz")
-                || n.endsWith(".tgz") || n.endsWith(".7z") || n.endsWith(".rar")
-                || n.endsWith(".xz") || n.endsWith(".bz2") || n.endsWith(".tar.gz");
+        // ★ 接入新结构：委托 hazefs.PathUtil（扩展名集合等价）
+        return com.hazeroot.scriptrunner.hazefs.PathUtil.isArchive(name);
     }
 
     /**
@@ -626,16 +621,16 @@ public final class FilesFragment extends Fragment {
      * 只有 .sh / .bash 或无扩展名（ELF 通常也无扩展名）才算脚本。
      */
     private boolean isScriptFile(String name) {
+        // ★ 接入新结构：[.sh/.bash] 判断交给 hazefs.FileFilter，
+        //   「无扩展名视为脚本（ELF）」是本项目特例，保留在此处。
         if (name == null || name.length() == 0) {
             return false;
         }
-        String n = name.toLowerCase(java.util.Locale.ROOT);
-        if (n.endsWith(".sh") || n.endsWith(".bash")) {
+        if (com.hazeroot.scriptrunner.hazefs.FileFilter.isShellScript(name)) {
             return true;
         }
-        // 无扩展名 → 可能是 ELF 可执行文件
-        int dot = n.lastIndexOf('.');
-        return dot < 0;
+        // 无扩展名 -> 可能是 ELF 可执行文件
+        return name.lastIndexOf('.') < 0;
     }
 
     /** 压缩包的点击动作：解压到本窗 / 右窗 */
@@ -4080,28 +4075,28 @@ public final class FilesFragment extends Fragment {
 
     /* JADX INFO: Access modifiers changed from: private */
     public final boolean isTextFile(String n) {
-        if (Kt.endsWith(n, ".sh", false, 2, (Object) null)) {
-            return false;
-        }
-        String ext = StringsKt.substringAfterLast(n, '.', "").toLowerCase(Locale.ROOT);
-        Intrinsics.checkNotNullExpressionValue(ext, "toLowerCase(...)");
-        return TEXT_EXT.contains(ext);
+        // ★ 接入新结构：扩展名集合 + 「.sh 排除」都已在 hazefs.PathUtil.isTextFile 内实现
+        //   （脚本走「编辑 / 执行」专用面板，不当纯文本直接编辑）。
+        return com.hazeroot.scriptrunner.hazefs.PathUtil.isTextFile(n);
     }
 
     /* JADX INFO: Access modifiers changed from: private */
     public final boolean isMediaFile(String n) {
-        String ext = StringsKt.substringAfterLast(n, '.', "").toLowerCase(Locale.ROOT);
-        Intrinsics.checkNotNullExpressionValue(ext, "toLowerCase(...)");
-        return VIDEO_EXT.contains(ext) || AUDIO_EXT.contains(ext) || IMG_EXT.contains(ext);
+        // ★ 接入新结构：视频/音频/图片三类判断合并为 PathUtil.isMedia
+        return com.hazeroot.scriptrunner.hazefs.PathUtil.isMedia(n);
     }
 
     /* JADX INFO: Access modifiers changed from: private */
     public final boolean isApkFile(String n) {
-        String lowerCase = n.toLowerCase(Locale.ROOT);
-        Intrinsics.checkNotNullExpressionValue(lowerCase, "toLowerCase(...)");
-        return new Regex(".*\\.?apk(\\.\\d+)?").matches(lowerCase);
+        // ★ 保留原正则语义：可匹配 base.apk / base.apk1 / base.apk.1 等形式
+        //   （apk 后面可能跟数字后缀，这是 Android 应用目录里常见的命名）。
+        //   PathUtil.isApk 只判断 .apk 结尾，覆盖不到这些，故此处保留原正则。
+        if (n == null) {
+            return false;
+        }
+        return java.util.regex.Pattern.compile(".*\\.?apk(\\.\\d+)?")
+                .matcher(n.toLowerCase(Locale.ROOT)).matches();
     }
-
     /* JADX INFO: Access modifiers changed from: private */
     public final void installApk(final FsEntry e) {
         final Context ctx = requireContext();

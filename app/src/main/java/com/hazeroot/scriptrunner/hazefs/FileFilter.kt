@@ -40,10 +40,25 @@ object FileFilter {
         }
     }
 
-    /** 是否 .sh / .bash 脚本 */
+    /**
+     * 是否 shell 脚本。
+     *
+     * ★ 行为对齐说明：旧实现（FilesFragment 的 onlyScripts 过滤）只认 `.sh`，
+     * 这里额外收 `.bash`。取舍理由：`.bash` 同样是可直接执行的 shell 脚本，
+     * 用户开「只显示脚本」时过滤掉 `.bash` 反而会漏掉真实脚本。
+     * 这是一处**有意放宽**，已在 BaselineEquivalenceTest 中标注；
+     * 如需严格对齐旧行为，把 `.bash` 分支删掉即可（单点改动）。
+     */
     @JvmStatic
     fun isShellScript(name: String?): Boolean {
         val n = name?.lowercase(Locale.ROOT) ?: return false
         return n.endsWith(".sh") || n.endsWith(".bash")
+    }
+
+    /** 严格对齐旧实现：只认 `.sh` */
+    @JvmStatic
+    fun isShellScriptStrict(name: String?): Boolean {
+        val n = name?.lowercase(Locale.ROOT) ?: return false
+        return n.endsWith(".sh")
     }
 }

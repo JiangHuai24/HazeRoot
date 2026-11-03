@@ -95,7 +95,9 @@ class PathUtilTest {
     fun `classification - text`() {
         assertTrue(PathUtil.isTextFile("a.txt"))
         assertTrue(PathUtil.isTextFile("a.json"))
-        assertTrue(PathUtil.isTextFile("a.sh"))
+        // ★ .sh 被刻意排除：脚本走「编辑/执行」专用面板，不当纯文本编辑。
+        //   这条行为与原 FilesFragment.isTextFile 一致（其第一句就是 .sh → false）。
+        assertFalse(PathUtil.isTextFile("a.sh"))
         assertFalse(PathUtil.isTextFile("a.zip"))
         assertFalse(PathUtil.isTextFile("a.mp4"))
     }
