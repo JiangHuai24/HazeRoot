@@ -2537,8 +2537,11 @@ public final class FilesFragment extends Fragment {
         Intrinsics.checkNotNullParameter(to, "$to");
         Intrinsics.checkNotNullParameter(pane, "$pane");
         Intrinsics.checkNotNullParameter(this$0, "this$0");
-        String first = Kt.substringBeforeLast(Kt.substringAfterLast((String) paths.get(0), '/', (String) null, 2, (Object) null), '.', (String) null, 2, (Object) null);
-        String dst = StringsKt.trimEnd(to.getDir(), '/') + "/" + first + "_batch.tar.gz";
+        // [D-002] 取「首个文件去掉扩展名」作为压缩包名前缀
+        String firstName = com.hazeroot.scriptrunner.hazefs.PathUtil.fileName((String) paths.get(0));
+        String first = firstName.substring(0, firstName.lastIndexOf('.') > 0
+                ? firstName.lastIndexOf('.') : firstName.length());
+        String dst = com.hazeroot.scriptrunner.hazefs.PathUtil.join(to.getDir(), first + "_batch.tar.gz");
         int i = 0;
         while (true) {
             String exec = Engine.INSTANCE.exec("[ -e " + Engine.INSTANCE.q(dst) + " ] && echo Y");
@@ -2552,7 +2555,8 @@ public final class FilesFragment extends Fragment {
             @Override // kotlin.jvm.functions.Function1
             public final CharSequence invoke(String it) {
                 Intrinsics.checkNotNullParameter(it, "it");
-                return Engine.INSTANCE.q(Kt.substringAfterLast(it, '/', (String) null, 2, (Object) null));
+                // [D-002] 取文件名后做 shell 转义
+                return Engine.INSTANCE.q(com.hazeroot.scriptrunner.hazefs.PathUtil.fileName(it));
             }
         }, 30, null);
         String cmd = "tar -czf " + Engine.INSTANCE.q(dst) + " -C " + Engine.INSTANCE.q(pane.getDir()) + " " + names;
@@ -3354,8 +3358,8 @@ public final class FilesFragment extends Fragment {
     }
 
     private final String mimeOf(String p) {
-        String ext = StringsKt.substringAfterLast(p, '.', "").toLowerCase(Locale.ROOT);
-        Intrinsics.checkNotNullExpressionValue(ext, "toLowerCase(...)");
+        // [D-002] 扩展名（小写、不含点）由 PathUtil 统一处理
+        String ext = com.hazeroot.scriptrunner.hazefs.PathUtil.extension(p);
         String mimeTypeFromExtension = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
         if (mimeTypeFromExtension != null) {
             return mimeTypeFromExtension;
@@ -3707,10 +3711,14 @@ public final class FilesFragment extends Fragment {
                     break;
                 }
                 i++;
-                String base = Kt.substringBeforeLast($src.getName(), '.', "", 2, (Object) null);
-                String ext = Kt.substringAfterLast($src.getName(), '.', "", 2, (Object) null);
+                // [D-002] 文件名与扩展名由 PathUtil 统一处理（重名文件加 (n) 序号）
+                String ext = com.hazeroot.scriptrunner.hazefs.PathUtil.extension($src.getName());
+                String nameOnly = $src.getName();
+                String base = ext.length() == 0 ? nameOnly
+                        : nameOnly.substring(0, nameOnly.length() - ext.length() - 1);
                 String dot = ext.length() == 0 ? "" : "." + ext;
-                dst = StringsKt.trimEnd($to.getDir(), '/') + "/" + base + " (" + i + ")" + dot;
+                dst = com.hazeroot.scriptrunner.hazefs.PathUtil.join(
+                        $to.getDir(), base + " (" + i + ")" + dot);
             }
         }
         String probe = Engine.INSTANCE.exec("[ -e " + Engine.INSTANCE.q(dst) + " ] && echo Y");
@@ -4207,8 +4215,8 @@ public final class FilesFragment extends Fragment {
     /* JADX INFO: Access modifiers changed from: private */
     public final void openMedia(FsEntry e) {
         String kind;
-        String ext = StringsKt.substringAfterLast(e.getName(), '.', "").toLowerCase(Locale.ROOT);
-        Intrinsics.checkNotNullExpressionValue(ext, "toLowerCase(...)");
+        // [D-002] 扩展名由 PathUtil 统一处理
+        String ext = com.hazeroot.scriptrunner.hazefs.PathUtil.extension(e.getName());
         if (VIDEO_EXT.contains(ext)) {
             kind = "video";
         } else {
@@ -4314,7 +4322,9 @@ public final class FilesFragment extends Fragment {
         }
         // 修复 ANR：mv 走 su（含重试+sleep），不能在主线程执行
         final String src = e.getPath();
-        final String dst = Kt.substringBeforeLast(e.getPath(), '/', (String) null, 2, (Object) null) + "/" + nn;
+        // [D-002] 父目录 + 新名拼接
+        final String dst = com.hazeroot.scriptrunner.hazefs.PathUtil.join(
+                com.hazeroot.scriptrunner.hazefs.PathUtil.parent(e.getPath()), nn);
         new Thread(new Runnable() {
             @Override // java.lang.Runnable
             public final void run() {
