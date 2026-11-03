@@ -1293,7 +1293,8 @@ public final class FilesFragment extends Fragment {
                 return;
             }
         }
-        String name = Kt.substringAfterLast(path, "/", (String) null, 2, (Object) null);
+        // [D-002] 接入 hazefs.PathUtil：取文件名
+        String name = com.hazeroot.scriptrunner.hazefs.PathUtil.fileName(path);
         if (name == null || name.length() == 0) {
             name = path;
         }
@@ -1568,7 +1569,8 @@ public final class FilesFragment extends Fragment {
         }
         this.activeIdx = 0;
         restylePanes();
-        Pane.load$default(this.panes.get(0), Kt.substringBeforeLast(path, '/', (String) null, 2, (Object) null), 0, 2, null);
+        // [D-002] 接入 hazefs.PathUtil：取父目录后打开
+        Pane.load$default(this.panes.get(0), com.hazeroot.scriptrunner.hazefs.PathUtil.parent(path), 0, 2, null);
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -1856,8 +1858,8 @@ public final class FilesFragment extends Fragment {
                 filesFragment.toast(string);
                 return;
             }
-            String parent = StringsKt.substringBeforeLast(this.dir, '/', "");
-            load$default(this, parent.length() == 0 ? "/" : parent, 0, 2, null);
+            // [D-002] 接入 hazefs.PathUtil：取父目录（已在根返回 "/"）
+            String parent = com.hazeroot.scriptrunner.hazefs.PathUtil.parent(this.dir);
         }
 
         public final void setHome() {
@@ -2452,8 +2454,9 @@ public final class FilesFragment extends Fragment {
             String dstDir = to.getDir();
             for (Object o : paths) {
                 String src = (String) o;
-                String name = Kt.substringAfterLast(src, '/', (String) null, 2, (Object) null);
-                String dst = dstDir + "/" + name;
+                // [D-002] 接入 hazefs.PathUtil：取文件名
+                String name = com.hazeroot.scriptrunner.hazefs.PathUtil.fileName(src);
+                String dst = com.hazeroot.scriptrunner.hazefs.PathUtil.join(dstDir, name);
                 String q = Engine.INSTANCE.q(src);
                 String qd = Engine.INSTANCE.q(dst);
                 // 源=目标 或 已存在则跳过
