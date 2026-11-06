@@ -134,7 +134,7 @@
     <string name="err_empty_path">路径不能为空</string>
     <string name="err_no_dir_fmt">目录不存在：%1$s</string>
     <string name="err_perm_fmt">权限被拒：%1$s</string>
-    <string name="err_read_dir">读取失败，请重试（Root 命令未返回结果）</string>
+    <string name="err_read_dir">读取失败：Root 命令无返回。若刚重装过 App，请到 Root 管理器重新授权后重试</string>
     <string name="err_slash">名称不能包含 /</string>
     <string name="err_url">请输入 http(s):// 开头的链接</string>
     <string name="error_a11y_label">Error: invalid</string>
