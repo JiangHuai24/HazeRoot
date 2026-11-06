@@ -1928,7 +1928,14 @@ public final class FilesFragment extends Fragment {
             Intrinsics.checkNotNullParameter(newDir, "$newDir");
             Intrinsics.checkNotNullParameter(this$0, "this$0");
             Intrinsics.checkNotNullParameter(this$1, "this$1");
-            String out = Engine.INSTANCE.exec("ls -Al " + Engine.INSTANCE.q(newDir));
+            // ★ 列举类命令走放宽模式（execListing）：
+            //   其它 App 的 /data/data/<pkg> 这类目录里常有受限条目，
+            //   ls 会以退出码 2 结束但可读条目已正常打印 —— 用严格模式会全丢，
+            //   用户看到「读取失败」，实际上目录能看。放宽后：
+            //     · 有条目 → 正常显示（个别受限条目跳过）
+            //     · 输出里含 Permission denied → 走下面的权限不足提示（精确文案）
+            //     · 真的什么都没有 → 才判定读取失败
+            String out = Engine.INSTANCE.execListing("ls -Al " + Engine.INSTANCE.q(newDir));
             final List parsed = new ArrayList();
             int i2 = 2;
             int i3 = 0;

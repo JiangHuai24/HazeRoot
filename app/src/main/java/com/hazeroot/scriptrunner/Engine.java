@@ -473,6 +473,15 @@ public final class Engine {
     }
 
     public final String su(String cmd) {
+        return suInternal(cmd, false);
+    }
+
+    /**
+     * su 执行主体。
+     * @param lenient true = 只读列举（ls）：退出码非 0 但有输出时仍返回输出
+     *                （遍历含受限条目的目录会以 2 退出，可读部分已正常打印）
+     */
+    private final String suInternal(String cmd, boolean lenient) {
         Intrinsics.checkNotNullParameter(cmd, "cmd");
         // 冷启动阶段 su 守护进程/授权链路可能尚未就绪，单次调用会偶发失败
         // （表现为"Root Active 却提示无 root / 命令失败"）。这里做 3 次重试。
@@ -485,13 +494,12 @@ public final class Engine {
                 // 后续命令会降回 shell(uid 2000)，导致 cp/tar 等以非 root 身份执行。
                 // 用 sh -c 显式包裹，保证整条复合命令在同一个 root shell 内运行。
                 p = new ProcessBuilder("su", "-c", "sh -c " + q(cmd)).redirectErrorStream(true).start();
-                InputStream inputStream = p.getInputStream();
-                Intrinsics.checkNotNullExpressionValue(inputStream, "getInputStream(...)");
-                String out = new String(ByteStreamsKt.readBytes(inputStream), Charsets.UTF_8);
-                if (p.waitFor() == 0) {
+                // ★ 修复：原实现用裸 readBytes + 无超时 waitFor，命令卡住会永久阻塞后台线程。
+                String out = readWithTimeout(p, EXEC_TIMEOUT_MS, lenient);
+                if (out != null) {
                     return out;
                 }
-                Log.d(TAG, "su 第 " + (attempt + 1) + " 次失败，cmd=" + cmd + " out=" + out);
+                Log.d(TAG, "su 第 " + (attempt + 1) + " 次失败/超时，cmd=" + cmd);
             } catch (Exception e) {
                 Log.d(TAG, "su 第 " + (attempt + 1) + " 次异常，cmd=" + cmd + " err=" + e);
             } finally {
@@ -515,7 +523,19 @@ public final class Engine {
      * 带超时的进程输出读取（自 fix/slow-repair 移植）。
      * 读流放独立 daemon 线程，主流程 waitFor(超时) 兜底，超时 destroy 进程。
      */
-    private static String readWithTimeout(java.lang.Process p, long timeoutMs) {
+    /**
+     * 带超时的进程输出读取（自 fix/slow-repair 移植）。
+     * 读流放独立 daemon 线程，主流程 waitFor(超时) 兜底，超时 destroy 进程。
+     *
+     * @param lenient true = 只读类命令（ls / cat / head）：
+     *                退出码非 0 但**有输出**时仍然返回输出。
+     *                原因：ls 遍历含受限条目的目录（其它 App 的 /data/data/&lt;pkg&gt; 很常见）
+     *                会以退出码 2 结束，但可读部分已经正常打印；丢弃它会让用户看到
+     *                「读取失败」，而实际上这个目录是能看的。
+     *                false = 变更类命令（cp/mv/rm/chmod/tar）：失败必须返回 null。
+     *                调用方普遍用 `exec(...) != null` 判定成功，放宽会造成「假成功」。
+     */
+    private static String readWithTimeout(java.lang.Process p, long timeoutMs, boolean lenient) {
         String[] holder = new String[1];
         Thread reader = new Thread(() -> {
             try {
@@ -538,13 +558,72 @@ public final class Engine {
                 p.destroy();
             } catch (Exception ignored) {
             }
-            return null;
+            // 超时：只读命令下已读到的部分结果仍有用，没有输出则返回 null
+            String partial = holder[0];
+            return (lenient && partial != null && partial.length() > 0) ? partial : null;
         }
         try {
             reader.join(2000L);
         } catch (Exception ignored) {
         }
-        return (p.exitValue() == 0) ? holder[0] : null;
+        String out = holder[0];
+        if (lenient) {
+            if (out != null && out.length() > 0) {
+                return out;
+            }
+            return (p.exitValue() == 0) ? "" : null;
+        }
+        return (p.exitValue() == 0) ? out : null;
+    }
+
+    /** 严格模式重载（变更类命令用） */
+    private static String readWithTimeout(java.lang.Process p, long timeoutMs) {
+        return readWithTimeout(p, timeoutMs, false);
+    }
+
+    /**
+     * 带超时的二进制输出读取（供 execBytes 使用）。
+     * lenient = true：编辑器读文件（cat / head -c）属只读操作，
+     * 文件可读但整条命令因个别原因以非 0 退出时，不该把读到的内容丢掉。
+     */
+    private static byte[] readBytesWithTimeout(java.lang.Process p, long timeoutMs, boolean lenient) {
+        byte[][] holder = new byte[1][];
+        Thread reader = new Thread(() -> {
+            try {
+                holder[0] = ByteStreamsKt.readBytes(p.getInputStream());
+            } catch (Exception e) {
+                Log.d(TAG, "读二进制流异常: " + e);
+            }
+        }, "proc-reader-bytes");
+        reader.setDaemon(true);
+        reader.start();
+        boolean finished = false;
+        try {
+            finished = p.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            Log.d(TAG, "waitFor 异常: " + e);
+        }
+        if (!finished) {
+            Log.d(TAG, "命令超时(" + timeoutMs + "ms)，强制结束进程");
+            try {
+                p.destroy();
+            } catch (Exception ignored) {
+            }
+            byte[] partial = holder[0];
+            return (lenient && partial != null && partial.length > 0) ? partial : null;
+        }
+        try {
+            reader.join(2000L);
+        } catch (Exception ignored) {
+        }
+        byte[] data = holder[0];
+        if (lenient) {
+            if (data != null && data.length > 0) {
+                return data;
+            }
+            return (p.exitValue() == 0) ? new byte[0] : null;
+        }
+        return (p.exitValue() == 0) ? data : null;
     }
 
     private static final long EXEC_TIMEOUT_MS = 60000L;
@@ -582,13 +661,27 @@ public final class Engine {
         }
         try {
             java.lang.Process p = new ProcessBuilder("sh", "-c", cmd).redirectErrorStream(true).start();
-            InputStream inputStream = p.getInputStream();
-            Intrinsics.checkNotNullExpressionValue(inputStream, "getInputStream(...)");
-            String out = new String(ByteStreamsKt.readBytes(inputStream), Charsets.UTF_8);
-            if (p.waitFor() == 0) {
-                return out;
-            }
+            return readWithTimeout(p, EXEC_TIMEOUT_MS);
+        } catch (Exception e) {
             return null;
+        }
+    }
+
+    /**
+     * 只读目录列举（ls -Al）专用：退出码非 0 但有输出时仍返回输出。
+     *
+     * 为什么单独开一个：变更类命令必须严格（失败=null，调用方据此判定成功），
+     * 但列举类命令遇到「目录里个别条目受限」时会以退出码 2 结束，
+     * 此时可读条目已经全部打印出来了，丢弃它们等于告诉用户「这个目录打不开」。
+     */
+    public final String execListing(String cmd) {
+        Intrinsics.checkNotNullParameter(cmd, "cmd");
+        if (rootAvailable()) {
+            return suInternal(cmd, true);
+        }
+        try {
+            java.lang.Process p = new ProcessBuilder("sh", "-c", cmd).redirectErrorStream(true).start();
+            return readWithTimeout(p, EXEC_TIMEOUT_MS, true);
         } catch (Exception e) {
             return null;
         }
@@ -603,13 +696,12 @@ public final class Engine {
                 java.lang.Process p = null;
                 try {
                     p = new ProcessBuilder("su", "-c", "sh -c " + q(cmd)).start();
-                    InputStream inputStream = p.getInputStream();
-                    Intrinsics.checkNotNullExpressionValue(inputStream, "getInputStream(...)");
-                    byte[] data = ByteStreamsKt.readBytes(inputStream);
-                    if (p.waitFor() == 0) {
+                    // ★ 只读语义（cat / head -c）：有数据就用，避免「文件明明能读却报读取失败」
+                    byte[] data = readBytesWithTimeout(p, EXEC_TIMEOUT_MS, true);
+                    if (data != null) {
                         return data;
                     }
-                    Log.d(TAG, "execBytes 第 " + (attempt + 1) + " 次失败，cmd=" + cmd);
+                    Log.d(TAG, "execBytes 第 " + (attempt + 1) + " 次失败/超时，cmd=" + cmd);
                 } catch (Exception e) {
                     Log.d(TAG, "execBytes 第 " + (attempt + 1) + " 次异常，cmd=" + cmd + " err=" + e);
                 } finally {
@@ -630,13 +722,7 @@ public final class Engine {
         }
         try {
             java.lang.Process p2 = new ProcessBuilder("sh", "-c", cmd).start();
-            InputStream inputStream2 = p2.getInputStream();
-            Intrinsics.checkNotNullExpressionValue(inputStream2, "getInputStream(...)");
-            byte[] data2 = ByteStreamsKt.readBytes(inputStream2);
-            if (p2.waitFor() == 0) {
-                return data2;
-            }
-            return null;
+            return readBytesWithTimeout(p2, EXEC_TIMEOUT_MS, true);
         } catch (Exception e2) {
             return null;
         }
