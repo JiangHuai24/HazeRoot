@@ -14,8 +14,8 @@ android {
         applicationId = "com.hazeroot.scriptrunner"
         minSdk = 26
         targetSdk = 34
-        versionCode = 70
-        versionName = "2.8.4"
+        versionCode = 71
+        versionName = "2.8.5"
     }
 
     buildTypes {
